@@ -4096,6 +4096,7 @@ const AI_MODELS = {
   nanobanana: { name: 'High Quality', fullName: 'High quality tier', cost: 30, color: '#2d5a35' },
   openai:     { name: 'Creative',     fullName: 'Creative tier',     cost: 50, color: '#6b7fb5' },
   stability:  { name: 'Fast',         fullName: 'Fast tier',         cost: 20, color: '#c4603a' },
+  edit:       { name: 'Edited',       fullName: 'Edit result',       cost: 30, color: '#8a6b9f' },
 };
 
 // ================================================================
@@ -4963,7 +4964,11 @@ async function downloadImage(url, id) {
 function sendToEdit(resultId) {
   const result = findResult(resultId);
   if (!result) return;
-  state.currentEditImage = { url: result.imageUrl, id: result.id };
+  state.currentEditImage = {
+    url: result.imageUrl,
+    id: result.id,
+    generationId: result.generationId || null,
+  };
   state.editHistory = [];
   renderEditCanvas();
   // navigate
@@ -4975,7 +4980,7 @@ function loadEditImage(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    state.currentEditImage = { url: ev.target.result, id: 'upload_' + Date.now() };
+    state.currentEditImage = { url: ev.target.result, id: 'upload_' + Date.now(), generationId: null };
     state.editHistory = [];
     renderEditCanvas();
   };
@@ -5023,6 +5028,7 @@ async function applyEdit() {
 
   try {
     let newImageUrl;
+    let newGenerationId = null;
     if (window.MODLAI_USE_MOCK) {
       await new Promise(r => setTimeout(r, 2000));
       const seed = Math.floor(Math.random() * 10000);
@@ -5031,21 +5037,31 @@ async function applyEdit() {
       const res = await MODLai.edit({
         imageUrl: state.currentEditImage.url,
         editPrompt: prompt,
+        sourceGenerationId: state.currentEditImage.generationId || null,
       });
       newImageUrl = res.imageUrl;
+      newGenerationId = res.generationId || null;
     }
 
     state.currentEditImage = {
       url: newImageUrl,
-      id: 'edit_' + Date.now()
+      id: 'edit_' + Date.now(),
+      generationId: newGenerationId,
     };
     state.editHistory.unshift({
       prompt,
-      time: new Date().toLocaleTimeString(currentLang === 'ko' ? 'ko-KR' : 'en-US', {hour:'2-digit', minute:'2-digit'})
+      time: new Date().toLocaleTimeString(currentLang === 'ko' ? 'ko-KR' : 'en-US', {hour:'2-digit', minute:'2-digit'}),
+      imageUrl: newImageUrl,
+      generationId: newGenerationId,
     });
     renderEditCanvas();
     toast(t('toast_edit_applied'), 'success');
     document.getElementById('editPrompt').value = '';
+
+    // Refresh history in the background so the new edit shows in History tab immediately
+    if (!window.MODLAI_USE_MOCK && newGenerationId) {
+      loadGenerations().catch(() => { /* silent */ });
+    }
   } catch (err) {
     console.error(err);
     state.credits += cost;
