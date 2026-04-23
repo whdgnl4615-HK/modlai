@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 - Do NOT contradict explicit garment details that appear in uploaded reference images${feedbackContext ? '\n\n[Past user feedback to learn from]\n' + feedbackContext : ''}`;
 
     const msg = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-haiku-4-5',
       max_tokens: 500,
       system: systemPrompt,
       messages: [{ role: 'user', content: `Refine this prompt: "${prompt}"` }],

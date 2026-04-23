@@ -17,6 +17,7 @@
     "api/publish/execute.js":         { "maxDuration": 60 },
     "api/publish/history.js":         { "maxDuration": 10 },
     "api/generations/index.js":       { "maxDuration": 10 },
+    "api/generations/[id]/index.js":   { "maxDuration": 15 },
     "api/generations/[id]/commerce.js": { "maxDuration": 10 },
     "api/datasources/sync.js":        { "maxDuration": 300 },
     "api/datasources/status.js":      { "maxDuration": 10 },

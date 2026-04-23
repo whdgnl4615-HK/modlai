@@ -44,7 +44,8 @@ export default async function handler(req, res) {
       if (loaded) {
         const identity = loaded.model.enriched_appearance || loaded.model.appearance || '';
         if (identity) {
-          fullPrompt = `${identity}\n\n${prompt}`;
+          // Strengthened identity prompt — Stability only has text to work with for face
+          fullPrompt = `The person has this specific appearance: ${identity}. ${prompt}`;
         }
         // If the user didn't upload a main garment, use the model's front sheet as structure
         if (!structureRef && loaded.refImages.model_front) {

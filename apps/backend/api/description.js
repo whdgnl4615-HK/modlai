@@ -98,7 +98,7 @@ Tone: trendy, sensory, professional — not hyped or over-salesy. Ready to drop 
     userContent.push({ type: 'text', text: contextText });
 
     const msg = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-haiku-4-5',
       max_tokens: 1200,
       system: systemPrompt,
       messages: [{ role: 'user', content: userContent }],

@@ -218,7 +218,7 @@ async function enrichAppearance(model) {
   ].filter(Boolean).join('\n');
 
   const msg = await client.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-haiku-4-5',
     max_tokens: 400,
     system: systemPrompt,
     messages: [{ role: 'user', content: `Write the rich description:\n\n${attrs}` }],

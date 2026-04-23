@@ -52,7 +52,11 @@ export default async function handler(req, res) {
         modelRefImages = loaded.refImages;
         const identity = loaded.model.enriched_appearance || loaded.model.appearance || '';
         if (identity) {
-          fullPrompt = `Keep the exact same model identity as shown in the reference image(s): ${identity}\n\n${prompt}`;
+          fullPrompt = `CRITICAL: The person in the output MUST be the same person shown in the reference images provided. Match the exact face, skin tone, hair color, hair length, and body proportions shown in the reference. Do NOT generate a different person.
+
+Reference person description: ${identity}
+
+Scene to create: ${prompt}`;
         }
       }
     }
