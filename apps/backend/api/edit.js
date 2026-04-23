@@ -5,7 +5,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
   handleCors, errorResponse, requireAuth, readJson,
   deductCredits, refundCredits, parseDataUrl, uploadGeneratedImage, EDIT_COST,
-  envMiddleware, requireOrg} from './_lib/utils.js';
+  envMiddleware, requireOrg, recordGeneration, recordGenerationResult,
+} from './_lib/utils.js';
 
 const MODEL_ID = 'gemini-2.5-flash-image';
 
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
   if (!deducted) return errorResponse(res, 402, 'insufficient_credits', 'Not enough credits');
 
   try {
-    const { imageUrl, editPrompt } = await readJson(req);
+    const { imageUrl, editPrompt, sourceGenerationId } = await readJson(req);
     if (!imageUrl)   { await refundCredits(user, cost); return errorResponse(res, 400, 'missing_image', 'imageUrl required'); }
     if (!editPrompt) { await refundCredits(user, cost); return errorResponse(res, 400, 'missing_prompt', 'editPrompt required'); }
 
@@ -90,7 +91,42 @@ export default async function handler(req, res) {
       publicUrl = `data:${mimeType};base64,${imageData}`;
     }
 
-    return res.status(200).json({ imageUrl: publicUrl, cost });
+    // ─── Persist to DB so the edit shows in History & survives refresh ───
+    // Edits are saved as their own generation row with model_key='edit' so the
+    // History view can list them alongside fresh generations.
+    let generationId = null;
+    try {
+      const genRow = await recordGeneration(user, {
+        prompt: `[Edit] ${editPrompt}`,
+        userPrompt: editPrompt,
+        category: 'edit',
+        background: null,
+        refImages: { source: imageUrl },     // keep a pointer back to the original
+        accImages: {},
+        totalCost: cost,
+        // Note: recordGeneration doesn't take `meta`, but we retain linkage
+        // via ref_images.source. Source tracking can be enhanced later.
+      });
+      generationId = genRow?.id || null;
+
+      if (generationId) {
+        await recordGenerationResult(generationId, user, {
+          modelKey: 'edit',
+          imageUrl: publicUrl,
+          cost,
+          meta: {
+            edit_prompt: editPrompt,
+            source_generation_id: sourceGenerationId || null,
+            source_image_url: imageUrl,
+          },
+        });
+      }
+    } catch (dbErr) {
+      // Don't fail the request if DB logging has trouble — user still gets their image
+      console.warn('[edit] DB persistence failed (non-fatal):', dbErr.message);
+    }
+
+    return res.status(200).json({ imageUrl: publicUrl, cost, generationId });
 
   } catch (err) {
     console.error('[edit]', err);
