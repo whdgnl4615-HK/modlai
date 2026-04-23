@@ -299,6 +299,81 @@
     font-weight: 500;
   }
 
+  /* ─── Preset tabs + grid (scene/background selector) ─── */
+  .preset-tabs {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+  .preset-tab {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    font-family: inherit;
+    letter-spacing: 0.01em;
+    display: flex; align-items: center; gap: 5px;
+    margin-bottom: -1px;
+  }
+  .preset-tab:hover { color: var(--text); }
+  .preset-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 500;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 4px 2px 4px 0;
+  }
+  .preset-card {
+    padding: 12px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    display: flex; flex-direction: column; gap: 4px;
+    min-height: 72px;
+  }
+  .preset-card:hover {
+    border-color: var(--text-muted);
+    transform: translateY(-1px);
+  }
+  .preset-card.active {
+    background: var(--accent-glow, rgba(45,90,53,0.08));
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .preset-card-icon {
+    font-size: 18px;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .preset-card-en {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+  }
+  .preset-card-ko {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    line-height: 1.2;
+  }
+  .preset-card.active .preset-card-en { color: var(--accent); }
+
   /* model selector */
   .model-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
   .model-option {
@@ -2110,25 +2185,10 @@
           </div>
 
           <div class="field">
-            <label class="field-label" data-i18n="label_bg">배경 / 씬</label>
-            <div class="chip-row" id="styleChips">
-              <div class="chip active" data-style="studio-white">스튜디오 · 화이트</div>
-              <div class="chip" data-style="studio-gradient">스튜디오 · 그라데이션</div>
-              <div class="chip" data-style="street-city">도시 거리</div>
-              <div class="chip" data-style="street-parisian">파리 거리</div>
-              <div class="chip" data-style="beach">해변</div>
-              <div class="chip" data-style="ocean">바다 · 요트</div>
-              <div class="chip" data-style="forest">숲 · 자연</div>
-              <div class="chip" data-style="desert">사막</div>
-              <div class="chip" data-style="mountain">산 · 설경</div>
-              <div class="chip" data-style="garden">정원 · 꽃</div>
-              <div class="chip" data-style="cafe">카페 · 인테리어</div>
-              <div class="chip" data-style="rooftop">루프탑</div>
-              <div class="chip" data-style="gallery">갤러리</div>
-              <div class="chip" data-style="neon-night">네온 · 밤</div>
-              <div class="chip" data-style="golden-hour">골든아워</div>
-              <div class="chip" data-style="minimal-architecture">미니멀 건축</div>
-            </div>
+            <label class="field-label" data-i18n="label_bg">Scene / Background</label>
+            <div class="preset-tabs" id="presetTabs"></div>
+            <div class="preset-grid" id="presetGrid"></div>
+            <div id="presetSelectedHint" style="font-size:11.5px;color:var(--accent);margin-top:8px;display:none;"></div>
           </div>
 
           <div class="field">
@@ -3746,7 +3806,7 @@ function updateDynamicI18n() {
 const state = {
   credits: 0,  // Populated from org.credits_balance on login — never trust this initial value
   selectedModels: new Set(['nanobanana', 'openai']),
-  selectedStyle: 'studio-white',
+  selectedStyle: 'studio-clean-cyc',
   selectedCategory: 'top',
   selectedRatio: '3:4',
   refImages: { main: null, back: null, side: null, detail: null },
@@ -3765,24 +3825,266 @@ const state = {
 };
 
 // style label map (한글 → AI prompt용 영문)
-const STYLE_PROMPTS = {
-  'studio-white': 'clean white studio backdrop, soft even lighting',
-  'studio-gradient': 'seamless gradient studio background, professional lighting',
-  'street-city': 'urban city street, modern architecture, natural daylight',
-  'street-parisian': 'charming Parisian cobblestone street, golden light, Haussmannian architecture',
-  'beach': 'sandy beach shoreline, ocean waves, warm natural light',
-  'ocean': 'luxury yacht on open sea, blue ocean, bright sunny day',
-  'forest': 'lush green forest, dappled sunlight filtering through trees',
-  'desert': 'vast desert landscape, warm sand dunes, dramatic sky',
-  'mountain': 'snowy mountain vista, crisp alpine air, pristine white snow',
-  'garden': 'blooming flower garden, soft bokeh, romantic atmosphere',
-  'cafe': 'warm cafe interior, vintage wood and brick, cozy lighting',
-  'rooftop': 'urban rooftop with city skyline view, magic hour',
-  'gallery': 'minimalist art gallery, white walls, museum lighting',
-  'neon-night': 'neon-lit night street, cyberpunk vibes, reflective surfaces',
-  'golden-hour': 'golden hour natural light, long shadows, warm tones',
-  'minimal-architecture': 'minimalist modern architecture, clean geometric lines, neutral palette',
+// ================================================================
+// STYLE PRESETS — US market focused
+// Each preset has: category, names (EN/KO), icon, and a detailed prompt
+// that references real film stocks, cameras, photographers, and magazine tones
+// to reduce AI-looking output and produce magazine-quality images.
+// ================================================================
+const STYLE_PRESETS = {
+  // ─── STUDIO ───
+  'studio-clean-cyc': {
+    category: 'studio', icon: '◻',
+    en: 'Clean Cyc Wall', ko: '클린 사이클로라마',
+    prompt: 'high-end studio cyc wall, Profoto D2 lighting, shot on Phase One IQ4, clean minimalism, seamless white curve, editorial e-commerce quality',
+  },
+  'studio-natural-window': {
+    category: 'studio', icon: '☀',
+    en: 'Natural Window Light', ko: '자연광 스튜디오',
+    prompt: 'north-facing window light, white paper backdrop, shot on Hasselblad X2D, Kinfolk magazine aesthetic, soft diffused daylight, minimal shadows',
+  },
+  'studio-colored-paper': {
+    category: 'studio', icon: '▨',
+    en: 'Colored Paper Backdrop', ko: '컬러 페이퍼 배경',
+    prompt: 'seamless colored paper backdrop (dusty pink or sage green), beauty dish lighting, contemporary lookbook style, Ssense campaign mood, crisp shadows',
+  },
+  'studio-hard-light': {
+    category: 'studio', icon: '⚡',
+    en: 'Hard Flash Editorial', ko: '하드 플래시 에디토리얼',
+    prompt: 'hard direct flash, seamless white backdrop, Juergen Teller editorial style, Vogue Paris aesthetic, raw candid energy, visible skin texture',
+  },
+  'studio-ring-light': {
+    category: 'studio', icon: '◯',
+    en: 'Soft Ring Light', ko: '링 라이트',
+    prompt: 'soft ring light, subtle catch-light in eyes, glossy magazine finish, Allure beauty campaign style, flattering even illumination',
+  },
+  'studio-gradient-neutral': {
+    category: 'studio', icon: '⟋',
+    en: 'Gradient Neutral', ko: '그라데이션 뉴트럴',
+    prompt: 'professional gradient backdrop (cream to taupe), soft strip lights, elevated e-commerce, Net-a-Porter product styling, subtle dimension',
+  },
+  'studio-shadow-play': {
+    category: 'studio', icon: '╱',
+    en: 'Shadow Play', ko: '섀도 플레이',
+    prompt: 'dappled shadows from louvered blinds, warm cream walls, Zara Studio 2024 campaign, afternoon light pattern, cinematic mood',
+  },
+
+  // ─── US CITIES ───
+  'nyc-soho-brick': {
+    category: 'us-cities', icon: '🗽',
+    en: 'SoHo Brick', ko: '뉴욕 소호',
+    prompt: 'SoHo cast-iron architecture, red brick buildings, Manhattan afternoon, shot on Leica M6 35mm, Portra 400 film, golden hour walk, candid street style',
+  },
+  'nyc-west-village': {
+    category: 'us-cities', icon: '🍂',
+    en: 'West Village Brownstone', ko: '웨스트 빌리지',
+    prompt: 'West Village brownstone steps, autumn leaves scattered, weekend-in-the-city editorial, warm NYC fall light, shot on Contax G2 film',
+  },
+  'nyc-chinatown-neon': {
+    category: 'us-cities', icon: '🏮',
+    en: 'Chinatown Neon', ko: '차이나타운 네온',
+    prompt: 'Chinatown neon signs at night, wet pavement reflections, cinematic teal and orange color grade, Wong Kar-wai mood, 35mm film grain',
+  },
+  'la-venice-beach': {
+    category: 'us-cities', icon: '🌴',
+    en: 'Venice Beach', ko: '베니스 비치',
+    prompt: 'Venice Beach boardwalk, California palm trees, shot on Contax T3 35mm, faded sun-kissed film look, Reformation campaign aesthetic',
+  },
+  'la-silver-lake': {
+    category: 'us-cities', icon: '☕',
+    en: 'Silver Lake Cafe', ko: '실버레이크',
+    prompt: 'Silver Lake hipster coffee shop exterior, mid-century modern architecture, warm LA sun, Aritzia lookbook vibe, natural daylight',
+  },
+  'la-rose-bowl': {
+    category: 'us-cities', icon: '🌸',
+    en: 'Rose Bowl Flea', ko: '로즈볼 플리',
+    prompt: 'Rose Bowl flea market, pastel retro signs, Sunday morning vintage vibe, sun-faded colors, Christy Dawn bohemian aesthetic',
+  },
+  'sf-painted-ladies': {
+    category: 'us-cities', icon: '🏘',
+    en: 'Painted Ladies', ko: '샌프란 빅토리안',
+    prompt: 'San Francisco Painted Ladies Victorian houses, foggy morning, muted pastel palette, Aperture magazine editorial style',
+  },
+  'miami-art-deco': {
+    category: 'us-cities', icon: '🌺',
+    en: 'Miami Art Deco', ko: '마이애미 아르데코',
+    prompt: 'South Beach Art Deco hotels, pastel Miami Vice aesthetic, palm tree shadows on pink walls, 80s nostalgia, Kodak Ektar film',
+  },
+  'austin-rainey': {
+    category: 'us-cities', icon: '🎸',
+    en: 'Austin Rainey Street', ko: '오스틴',
+    prompt: 'Austin Rainey Street bungalow bars, warm Texas dusk, indie music poster vibes, Free People campaign mood, golden hour',
+  },
+  'brooklyn-dumbo': {
+    category: 'us-cities', icon: '🌉',
+    en: 'Brooklyn DUMBO', ko: '브루클린 덤보',
+    prompt: 'DUMBO Brooklyn cobblestone with Manhattan Bridge view, Kate Moss 90s street style reference, shot on Mamiya 7 medium format',
+  },
+
+  // ─── GLOBAL CITIES ───
+  'paris-marais': {
+    category: 'global-cities', icon: '🇫🇷',
+    en: 'Paris Le Marais', ko: '파리 마레',
+    prompt: 'Paris Le Marais cobblestones at golden hour, Haussmann wrought-iron balconies, shot on 35mm Summilux, French Vogue editorial, effortless Parisian chic',
+  },
+  'paris-palais-royal': {
+    category: 'global-cities', icon: '⛲',
+    en: 'Palais Royal', ko: '팔레 로얄',
+    prompt: 'Palais Royal colonnade arcade, geometric shadows, French Vogue editorial by Inez and Vinoodh, classic Parisian architecture',
+  },
+  'london-notting-hill': {
+    category: 'global-cities', icon: '🏡',
+    en: 'Notting Hill', ko: '노팅힐',
+    prompt: 'Notting Hill pastel row houses, London autumn light, Love Magazine aesthetic, charming British street, diffused overcast glow',
+  },
+  'milan-brera': {
+    category: 'global-cities', icon: '🍷',
+    en: 'Milan Brera', ko: '밀라노 브레라',
+    prompt: 'Milan Brera district cobblestone streets, 6pm aperitivo hour warm tones, Italian Vogue editorial, elegant evening light',
+  },
+  'tokyo-harajuku': {
+    category: 'global-cities', icon: '🗾',
+    en: 'Tokyo Harajuku', ko: '도쿄 하라주쿠',
+    prompt: 'Harajuku Takeshita Street daytime, subtle motion blur, Tokyo street style photography, shot on Ricoh GR III, candid editorial',
+  },
+  'copenhagen-nyhavn': {
+    category: 'global-cities', icon: '⚓',
+    en: 'Copenhagen Nyhavn', ko: '코펜하겐 니하운',
+    prompt: 'Copenhagen Nyhavn colorful harbor houses, crisp Nordic light, Ganni SS24 campaign aesthetic, Scandinavian minimalism',
+  },
+
+  // ─── US NATURE ───
+  'malibu-cliffs': {
+    category: 'us-nature', icon: '🌊',
+    en: 'Malibu Cliffs', ko: '말리부 절벽',
+    prompt: 'Malibu Point Dume cliffs at sunset, California coastal light, Saint Laurent 2023 campaign mood, dramatic Pacific horizon',
+  },
+  'joshua-tree': {
+    category: 'us-nature', icon: '🌵',
+    en: 'Joshua Tree', ko: '조슈아트리',
+    prompt: 'Joshua Tree National Park, golden desert, dramatic yucca silhouettes, Levi\'s Americana campaign style, shot on Pentax 67',
+  },
+  'big-sur-coast': {
+    category: 'us-nature', icon: '🌫',
+    en: 'Big Sur', ko: '빅서 해안',
+    prompt: 'Big Sur Highway 1 cliffs, Pacific fog rolling in, moody overcast drama, rugged California coast, Ralph Lauren Americana',
+  },
+  'tulum-beach': {
+    category: 'us-nature', icon: '🏖',
+    en: 'Tulum Beach', ko: '툴룸 해변',
+    prompt: 'Tulum white sand beach, turquoise Caribbean water, boho eco-luxury vibe, Faithfull The Brand campaign, tropical golden hour',
+  },
+  'aspen-snow': {
+    category: 'us-nature', icon: '❄',
+    en: 'Aspen Snow', ko: '아스펜 설원',
+    prompt: 'Aspen ski resort, crisp alpine snow, cozy apres-ski warmth, Loro Piana cashmere campaign mood, winter luxury',
+  },
+  'montauk-dunes': {
+    category: 'us-nature', icon: '🌾',
+    en: 'Montauk Dunes', ko: '몬탁 해변',
+    prompt: 'Montauk dunes grass in golden light, Hamptons summer, sun-faded Polaroid look, Jenni Kayne aesthetic, East Coast summer editorial',
+  },
+  'napa-vineyard': {
+    category: 'us-nature', icon: '🍇',
+    en: 'Napa Vineyard', ko: '나파 밸리',
+    prompt: 'Napa Valley vineyard at harvest, warm Tuscan-like light, elevated wine country, Ulla Johnson fall campaign, endless rows',
+  },
+  'palm-springs-pool': {
+    category: 'us-nature', icon: '🏊',
+    en: 'Palm Springs Pool', ko: '팜스프링스 풀',
+    prompt: 'Palm Springs mid-century poolside, pastel cabanas, Slim Aarons 1970s nostalgia, turquoise pool tiles, retro desert glamour',
+  },
+
+  // ─── INTERIOR ───
+  'hotel-lobby-lux': {
+    category: 'interior', icon: '🛎',
+    en: 'Luxury Hotel Lobby', ko: '럭셔리 호텔',
+    prompt: 'boutique luxury hotel lobby (Aman or Four Seasons style), warm marble, jewel-tone accents, soft tungsten lighting, refined editorial',
+  },
+  'cafe-west-village': {
+    category: 'interior', icon: '☕',
+    en: 'Coffee Shop', ko: '웨스트빌리지 카페',
+    prompt: 'West Village coffee shop interior, exposed brick, warm wood, Sunday morning vibe, NYC cafe culture, natural window light',
+  },
+  'gallery-white-box': {
+    category: 'interior', icon: '🖼',
+    en: 'Gallery', ko: '미니멀 갤러리',
+    prompt: 'minimalist Chelsea art gallery, pristine white walls, polished concrete floor, contemporary art backdrop, museum lighting',
+  },
+  'library-oxford': {
+    category: 'interior', icon: '📚',
+    en: 'Classic Library', ko: '클래식 도서관',
+    prompt: 'Oxford-style library, dark mahogany paneling, green leather chairs, academic mood, warm tungsten lamps, old money aesthetic',
+  },
+  'bookstore-indie': {
+    category: 'interior', icon: '📖',
+    en: 'Indie Bookstore', ko: '독립 서점',
+    prompt: 'Brooklyn indie bookstore, tungsten lights, towering bookshelves, cozy intellectual atmosphere, warm autumn mood',
+  },
+  'midcentury-poolside': {
+    category: 'interior', icon: '🪴',
+    en: 'Midcentury Poolside', ko: '미드센추리 풀사이드',
+    prompt: 'mid-century modern poolside patio, terrazzo deck, Palm Springs 1962 aesthetic, desert modernism, sharp sunlight and blue shadows',
+  },
+
+  // ─── EDITORIAL ───
+  'film-90s-kate': {
+    category: 'editorial', icon: '🎞',
+    en: '90s Supermodel', ko: '90s 슈퍼모델',
+    prompt: '90s supermodel editorial, Helmut Newton homage, black and white, grainy Tri-X 400, dramatic chiaroscuro, timeless glamour',
+  },
+  'film-70s-helmut': {
+    category: 'editorial', icon: '📸',
+    en: '70s Kodachrome', ko: '70s 코다크롬',
+    prompt: '1970s fashion film aesthetic, warm saturated Kodachrome colors, Guy Bourdin campaign mood, surreal composition, retro glam',
+  },
+  'pinterest-pastel': {
+    category: 'editorial', icon: '🌷',
+    en: 'Pinterest Pastel', ko: '파스텔 핀터레스트',
+    prompt: 'Pinterest-ready soft pastel palette, dreamy haze, Gen Z aesthetic, film grain, cottagecore meets coquette',
+  },
+  'vogue-american': {
+    category: 'editorial', icon: '📰',
+    en: 'American Vogue', ko: '미국 보그',
+    prompt: 'American Vogue cover style, crisp studio lighting, Annie Leibovitz direction, powerful composition, editorial sophistication',
+  },
+  'revolve-influencer': {
+    category: 'editorial', icon: '✨',
+    en: 'Revolve Influencer', ko: '레볼브 인플루언서',
+    prompt: 'Revolve Festival influencer vibe, Instagram-ready, Coachella 2024 aesthetic, golden California sun, effortless glam',
+  },
+  'ganni-copenhagen': {
+    category: 'editorial', icon: '🌸',
+    en: 'Ganni Campaign', ko: '가니 캠페인',
+    prompt: 'Ganni campaign aesthetic, Copenhagen cool girl, natural daylight, Fall 2024 lookbook, Scandinavian minimalism with personality',
+  },
+  'reformation-california': {
+    category: 'editorial', icon: '🌞',
+    en: 'Reformation', ko: '리포메이션 캘리',
+    prompt: 'Reformation brand campaign, California sun-kissed, effortless romantic, vintage-inspired, sustainable fashion editorial',
+  },
+  'y2k-revival': {
+    category: 'editorial', icon: '💿',
+    en: 'Y2K Revival', ko: 'Y2K 리바이벌',
+    prompt: 'Y2K aesthetic, butterfly clips, low-rise, faded film look, Tumblr 2010 nostalgia, Juicy Couture era, flash-lit party',
+  },
 };
+
+// Categories with metadata for UI tabs
+const PRESET_CATEGORIES = [
+  { key: 'studio',         en: 'Studio',        ko: '스튜디오',     icon: '◻' },
+  { key: 'us-cities',      en: 'US Cities',     ko: '미국 도시',    icon: '🗽' },
+  { key: 'global-cities',  en: 'Global Cities', ko: '글로벌',       icon: '🌍' },
+  { key: 'us-nature',      en: 'US Nature',     ko: '미국 자연',    icon: '🌊' },
+  { key: 'interior',       en: 'Interior',      ko: '인테리어',     icon: '🛋' },
+  { key: 'editorial',      en: 'Editorial',     ko: '에디토리얼',   icon: '📸' },
+];
+
+// Backwards-compatible: STYLE_PROMPTS is still used in a couple of places
+// for simple prompt lookup. Map the new presets to the old-style key→prompt shape.
+const STYLE_PROMPTS = Object.fromEntries(
+  Object.entries(STYLE_PRESETS).map(([key, p]) => [key, p.prompt])
+);
 
 const CATEGORY_LABELS = {
   top: '상의', outer: '아우터', dress: '원피스', bottom: '하의',
@@ -3854,14 +4156,85 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ================================================================
-// CHIP SELECTORS
+// CHIP SELECTORS + PRESET SCENE SELECTOR
 // ================================================================
-document.getElementById('styleChips').addEventListener('click', e => {
-  if (!e.target.classList.contains('chip')) return;
-  document.querySelectorAll('#styleChips .chip').forEach(c => c.classList.remove('active'));
-  e.target.classList.add('active');
-  state.selectedStyle = e.target.dataset.style;
+
+// Render preset tabs (category switcher)
+let activePresetCategory = 'studio';
+function renderPresetTabs() {
+  const container = document.getElementById('presetTabs');
+  if (!container) return;
+  container.innerHTML = PRESET_CATEGORIES.map(c => `
+    <button type="button" class="preset-tab${c.key === activePresetCategory ? ' active' : ''}" data-cat="${c.key}">
+      <span>${c.icon}</span>
+      <span>${c.en}</span>
+    </button>
+  `).join('');
+}
+
+// Render preset grid for the active category
+function renderPresetGrid() {
+  const container = document.getElementById('presetGrid');
+  if (!container) return;
+  const entries = Object.entries(STYLE_PRESETS).filter(([_, p]) => p.category === activePresetCategory);
+  container.innerHTML = entries.map(([key, p]) => `
+    <div class="preset-card${key === state.selectedStyle ? ' active' : ''}" data-preset="${key}" title="${escapeHtml(p.prompt)}">
+      <div class="preset-card-icon">${p.icon}</div>
+      <div class="preset-card-en">${escapeHtml(p.en)}</div>
+      <div class="preset-card-ko">${escapeHtml(p.ko)}</div>
+    </div>
+  `).join('');
+  updatePresetHint();
+}
+
+// Show selected preset name as a small reminder below the grid
+function updatePresetHint() {
+  const hint = document.getElementById('presetSelectedHint');
+  if (!hint) return;
+  const preset = STYLE_PRESETS[state.selectedStyle];
+  if (preset) {
+    hint.style.display = 'block';
+    hint.textContent = `✓ ${preset.en} · ${preset.ko}`;
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+// Wire up tab switching
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.preset-tab');
+  if (tab) {
+    activePresetCategory = tab.dataset.cat;
+    renderPresetTabs();
+    renderPresetGrid();
+    return;
+  }
+  const card = e.target.closest('.preset-card');
+  if (card) {
+    state.selectedStyle = card.dataset.preset;
+    // Update active state in current grid
+    document.querySelectorAll('#presetGrid .preset-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    updatePresetHint();
+  }
 });
+
+// Initial render — defer until DOM is ready and elements exist
+function initPresetSelector() {
+  if (!document.getElementById('presetTabs')) return;
+  // If current selectedStyle isn't in new preset set, reset to a safe default
+  if (!STYLE_PRESETS[state.selectedStyle]) {
+    state.selectedStyle = 'studio-clean-cyc';
+  }
+  // Jump to category containing the selected preset
+  const sel = STYLE_PRESETS[state.selectedStyle];
+  if (sel) activePresetCategory = sel.category;
+  renderPresetTabs();
+  renderPresetGrid();
+}
+// Init after DOM is parsed (script runs inside body, so elements above exist)
+initPresetSelector();
+
 document.getElementById('ratioChips').addEventListener('click', e => {
   if (!e.target.classList.contains('chip')) return;
   document.querySelectorAll('#ratioChips .chip').forEach(c => c.classList.remove('active'));
