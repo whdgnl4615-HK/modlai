@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "functions": {
+    "api/generate/*.js":              { "maxDuration": 60 },
+    "api/edit.js":                    { "maxDuration": 60 },
+    "api/description.js":             { "maxDuration": 30 },
+    "api/compare.js":                 { "maxDuration": 30 },
+    "api/refine-prompt.js":           { "maxDuration": 15 },
+    "api/payments/*.js":              { "maxDuration": 15 },
+    "api/payments/webhook/*.js":      { "maxDuration": 30 },
+    "api/admin/*.js":                 { "maxDuration": 15 },
+    "api/models/index.js":            { "maxDuration": 15 },
+    "api/models/[id].js":             { "maxDuration": 15 },
+    "api/models/[id]/generate-sheet.js": { "maxDuration": 300 },
+    "api/channels/*.js":              { "maxDuration": 15 },
+    "api/publish/preview.js":         { "maxDuration": 15 },
+    "api/publish/execute.js":         { "maxDuration": 60 },
+    "api/publish/history.js":         { "maxDuration": 10 },
+    "api/generations/index.js":       { "maxDuration": 10 },
+    "api/generations/[id]/commerce.js": { "maxDuration": 10 },
+    "api/datasources/sync.js":        { "maxDuration": 300 },
+    "api/datasources/status.js":      { "maxDuration": 10 },
+    "api/insights/dashboard.js":      { "maxDuration": 15 },
+    "api/insights/products.js":       { "maxDuration": 10 },
+    "api/insights/diagnose.js":       { "maxDuration": 60 },
+    "api/imports/upload.js":          { "maxDuration": 60 },
+    "api/imports/execute.js":         { "maxDuration": 120 },
+    "api/imports/history.js":         { "maxDuration": 10 },
+    "api/imports/masters.js":         { "maxDuration": 10 },
+    "api/imports/masters/[id].js":    { "maxDuration": 10 },
+    "api/imports/masters/[id]/link-generation.js": { "maxDuration": 10 },
+    "api/imports/bulk.js":            { "maxDuration": 30 },
+    "api/organizations/index.js":     { "maxDuration": 10 },
+    "api/organizations/[id].js":      { "maxDuration": 10 },
+    "api/organizations/[id]/members.js":     { "maxDuration": 10 },
+    "api/organizations/[id]/invitations.js": { "maxDuration": 10 },
+    "api/invitations/accept.js":      { "maxDuration": 10 },
+    "api/recommendations/apply.js":   { "maxDuration": 30 },
+    "api/recommendations/history.js": { "maxDuration": 10 }
+  },
+  "crons": [
+    {
+      "path": "/api/datasources/cron",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
