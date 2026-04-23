@@ -10,14 +10,12 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // Configure backend URL here. Leave as /api if frontend + backend on same origin.
-  // Point to your deployed backend for production (e.g. https://modlai-backend.vercel.app/api).
-  window.MODLAI_API_BASE = '/api';
+  // Backend API base — MODLai Vercel backend deployment
+  window.MODLAI_API_BASE = 'https://modlai-sage.vercel.app/api';
 
-  // Supabase public config — safe to ship to browser.
-  // Set these before deploying to production.
-  window.SUPABASE_URL      = ''; // e.g. 'https://xxxxx.supabase.co'
-  window.SUPABASE_ANON_KEY = ''; // starts with 'eyJ...'
+  // Supabase public config — safe to ship to browser (anon key has RLS restrictions)
+  window.SUPABASE_URL      = 'https://qmnvcxhmymmsyesaqiql.supabase.co';
+  window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtbnZjeGhteW1tc3llc2FxaXFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTE4NjQsImV4cCI6MjA5MjQ2Nzg2NH0.e8dVqFbfTrAMyHvsZIce47CE8GCQfTvv1dYFSR-MbU0';
 
   // MOCK MODE: only for development without a backend. Always false in production.
   window.MODLAI_USE_MOCK = false;
@@ -4005,7 +4003,7 @@ async function generateWithModel(modelKey, prompt, genId) {
   let imageUrl;
   let apiError = null;
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     // Mock mode — placeholder images
     const delay = 1500 + Math.random() * 2500;
     await new Promise(r => setTimeout(r, delay));
@@ -4419,7 +4417,7 @@ async function applyEdit() {
 
   try {
     let newImageUrl;
-    if (false /* mock removed */) {
+    if (window.MODLAI_USE_MOCK) {
       await new Promise(r => setTimeout(r, 2000));
       const seed = Math.floor(Math.random() * 10000);
       newImageUrl = `https://picsum.photos/seed/edit${seed}/800/1000`;
@@ -4481,7 +4479,7 @@ async function saveModel() {
   const origText = btn.textContent;
 
   // ── Mock mode: no backend ──
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     btn.disabled = true;
     btn.textContent = '모델 생성 중…';
     await new Promise(r => setTimeout(r, 800));
@@ -4578,7 +4576,7 @@ async function enrichAppearanceUI() {
     toast(currentLang === 'ko' ? '먼저 간단히 묘사를 적어주세요' : 'Write a short description first', 'error');
     return;
   }
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     el.value = current + '. 매끈한 피부, 가는 눈썹, 또렷한 눈매, 쌍꺼풀 없음, 자연스러운 핑크 톤 입술, 광대뼈가 도드라지며 깨끗한 얼굴선. 짙은 흑색 롱 웨이브 머리, 곧은 자세, 길고 날씬한 몸매 비율.';
     toast('AI 상세 묘사 적용됨 (mock)', 'success');
     return;
@@ -4598,7 +4596,7 @@ async function enrichAppearanceUI() {
 }
 
 async function loadFashionModels() {
-  if (false /* mock removed */) return; // mock mode uses state.fashionModels directly
+  if (window.MODLAI_USE_MOCK) return; // mock mode uses state.fashionModels directly
   try {
     const { models } = await MODLai.models.list();
     state.fashionModels = models || [];
@@ -4735,7 +4733,7 @@ async function openCreditModal() {
 
 async function loadPaymentConfig() {
   // Mock mode: fake config
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     paymentConfig = {
       activeProvider: 'stripe',
       publishableKey: null,
@@ -4872,7 +4870,7 @@ async function processPayment() {
   };
 
   // ── Mock mode: simple simulation ──
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     setLoading();
     await new Promise(r => setTimeout(r, 1500));
     state.credits += state.currentPackage.credits;
@@ -5093,7 +5091,7 @@ async function refreshPublishPreview() {
   issuesEl.innerHTML = '';
 
   // Mock mode — fake preview
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     const mockProduct = {
       title: 'Aria Minimalist Tee',
       description: 'A clean essential — the backbone of any capsule wardrobe.',
@@ -5195,7 +5193,7 @@ async function saveCommerceMeta() {
     },
   };
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     toast('저장됨 (mock)', 'success');
   } else {
     try {
@@ -5221,7 +5219,7 @@ async function doPublish() {
   const orig = btn.innerHTML;
   btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:1.5px;display:inline-block;vertical-align:-2px;"></span> Publishing...';
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 1500));
     toast(`${currentChannel} 에 전송됨 (mock)`, 'success');
     closeModal('publishModal');
@@ -5289,7 +5287,7 @@ async function saveChannelConnection() {
   const orig = btn.textContent;
   btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px;display:inline-block;vertical-align:-1px;"></span> 테스트 중...';
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 1000));
     toast(channel + ' 연결됨 (mock)', 'success');
     closeModal('channelSettingsModal');
@@ -5427,7 +5425,7 @@ async function handleImportFile(event) {
       </div>`;
 
     // Call upload endpoint
-    if (false /* mock removed */) {
+    if (window.MODLAI_USE_MOCK) {
       await new Promise(r => setTimeout(r, 1500));
       importState.uploadResult = mockUploadResult(file.name);
     } else {
@@ -5636,7 +5634,7 @@ async function doImport() {
   resultEl.style.display = 'block';
   resultEl.innerHTML = '<div class="publish-issue info">⏳ 상품 마스터에 저장 중...</div>';
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 1800));
     importState.importResult = {
       masters_created: importState.uploadResult.rowCount,
@@ -5701,7 +5699,7 @@ async function loadCatalog() {
   el.innerHTML = '<div style="text-align:center;padding:40px 0;"><div class="spinner" style="width:24px;height:24px;border-width:2px;"></div></div>';
 
   let data;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     data = { masters: mockMasters(), total: 20 };
   } else {
     try {
@@ -5801,7 +5799,7 @@ async function openImportHistoryModal() {
   el.innerHTML = '<div style="text-align:center;padding:30px 0;"><div class="spinner" style="width:20px;height:20px;border-width:2px;"></div></div>';
 
   let jobs;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     jobs = [
       { id: '1', filename: 'SS25_line_sheet.xlsx', status: 'completed', masters_created: 108, variants_created: 0, created_at: new Date().toISOString(), duration_ms: 3400 },
     ];
@@ -5860,7 +5858,7 @@ async function openMasterDetail(masterId) {
   content.innerHTML = '<div style="text-align:center;padding:40px 0;"><div class="spinner" style="width:24px;height:24px;border-width:2px;"></div></div>';
 
   let data;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     data = mockMasterDetail(masterId);
   } else {
     try {
@@ -6065,7 +6063,7 @@ function switchSettingsTab(tab) {
 }
 
 async function loadSettings() {
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     settingsState.org = {
       id: 'demo-org', name: 'Demo Fashion Brand', slug: 'demo-fashion',
       plan: 'pro', credits_balance: 1240, billing_email: 'owner@example.com',
@@ -6259,7 +6257,7 @@ async function saveOrgSettings() {
   const name = document.getElementById('orgNameInput').value.trim();
   const billing_email = document.getElementById('orgBillingInput').value.trim();
   if (!name) { toast('Name required', 'error'); return; }
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     settingsState.org.name = name; settingsState.org.billing_email = billing_email;
     toast('Saved', 'success'); renderSettingsTab(); return;
   }
@@ -6270,7 +6268,7 @@ async function saveOrgSettings() {
 }
 
 async function changeMemberRole(userId, role) {
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     const m = settingsState.members.find(x => x.user_id === userId);
     if (m) m.role = role; renderSettingsTab(); return;
   }
@@ -6282,7 +6280,7 @@ async function changeMemberRole(userId, role) {
 
 async function removeMember(userId) {
   if (!confirm('Remove this member?')) return;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     settingsState.members = settingsState.members.filter(m => m.user_id !== userId);
     renderSettingsTab(); return;
   }
@@ -6320,7 +6318,7 @@ async function sendInvite() {
 
 async function revokeInvite(id) {
   if (!confirm('Revoke invitation?')) return;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     settingsState.invitations = settingsState.invitations.filter(i => i.id !== id);
     renderSettingsTab(); return;
   }
@@ -6333,7 +6331,7 @@ async function revokeInvite(id) {
 function openCreateOrgModal() {
   const name = prompt('Organization name:');
   if (!name || !name.trim()) return;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     settingsState.org = {
       id: 'demo-org', name: name.trim(), slug: name.toLowerCase().replace(/\s+/g,'-'),
       plan: 'free', credits_balance: 100, role: 'owner',
@@ -6379,7 +6377,7 @@ async function loadInsights() {
   el.innerHTML = `<div style="text-align:center;padding:60px 0;"><div class="spinner" style="width:28px;height:28px;border-width:2.5px;"></div><div style="color:var(--text-muted);font-size:12px;margin-top:12px;">${t('loading')}</div></div>`;
 
   let data;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     data = mockDashboard();
   } else {
     try {
@@ -6521,7 +6519,7 @@ async function loadStoreProducts() {
   el.innerHTML = '<div style="text-align:center;padding:40px 0;"><div class="spinner" style="width:24px;height:24px;border-width:2px;"></div></div>';
 
   let data;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     data = { products: mockProducts(24), total: 24 };
   } else {
     try {
@@ -6595,7 +6593,7 @@ async function doSync() {
   progEl.style.display = 'block';
   progEl.innerHTML = `<div class="publish-issue info">⏳ ${channel} 에서 ${entity === 'all' ? '전체 데이터' : entity} 가져오는 중. 첫 동기화는 몇 분 걸릴 수 있어요.</div>`;
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 2000));
     progEl.innerHTML = `<div class="publish-issue info">✓ Mock sync 완료: 24 products, 156 orders, 89 customers</div>`;
     btn.disabled = false;
@@ -6646,7 +6644,7 @@ async function openDiagnose(productId, masterId) {
     </div>`;
 
   let result;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 2500));
     result = { diagnosis: mockDiagnosis(), product: { title: 'Mock Product' } };
   } else {
@@ -6757,7 +6755,7 @@ async function applyRecommendation(recIdx) {
     </div>`;
 
   let data;
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 900));
     data = mockApplyPreview(rec);
   } else {
@@ -6915,7 +6913,7 @@ async function commitApply(recIdx, customValue) {
   const btn = event.target.closest('button');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
-  if (false /* mock removed */) {
+  if (window.MODLAI_USE_MOCK) {
     await new Promise(r => setTimeout(r, 700));
     toast(t('apply_success'), 'success');
     closeModal('applyRecModal');
@@ -6984,13 +6982,11 @@ if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY && typeof window.supabase !=
 }
 
 async function initAuth() {
-  // If Supabase isn't configured, skip auth and just show the app.
-  // (For local dev before Supabase keys are set.)
+  // If Supabase isn't configured, the app can't work. Show a clear setup message.
   if (!supabaseClient) {
-    console.warn('[auth] Supabase not configured. Running without authentication.');
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('orgCreateOverlay').style.display = 'none';
-    await postLoginBoot();
+    showSetupRequiredScreen();
     return;
   }
 
@@ -7016,6 +7012,34 @@ async function initAuth() {
       showAuthOverlay();
     }
   });
+}
+
+function showSetupRequiredScreen() {
+  // Takes over the auth overlay with a setup instructions screen
+  const overlay = document.getElementById('authOverlay');
+  const card = overlay.querySelector('.auth-card');
+  card.innerHTML = `
+    <div class="auth-brand">
+      <span>MOD</span><em style="font-style:italic;color:var(--accent);">L</em><span>ai</span>
+    </div>
+    <div class="auth-title">Setup required</div>
+    <div class="auth-sub">Connect to Supabase to start using MODLai.</div>
+
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;font-size:12.5px;line-height:1.7;">
+      <strong>To activate this app:</strong>
+      <ol style="margin:8px 0 0;padding-left:20px;">
+        <li>Create a Supabase project at <a href="https://supabase.com" target="_blank" style="color:var(--accent);">supabase.com</a></li>
+        <li>Run the SQL migrations from <code>apps/backend/supabase/</code></li>
+        <li>Deploy the backend to Vercel</li>
+        <li>Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> in <code>index.html</code></li>
+      </ol>
+    </div>
+
+    <div style="font-size:11.5px;color:var(--text-muted);line-height:1.6;">
+      Full setup guide in <code>docs/01-supabase-setup.md</code> and <code>docs/11-storage-and-email.md</code>.
+    </div>
+  `;
+  overlay.style.display = 'flex';
 }
 
 function showAuthOverlay() {
