@@ -2634,6 +2634,19 @@
         <div style="color:var(--text);font-weight:500;margin-bottom:4px;">💎 Character Sheet 자동 생성</div>
         저장하면 4개 앵글(정면/3/4/측면/전신)의 레퍼런스 이미지가 자동 생성됩니다 (<strong id="sheetCostLabel">120 크레딧</strong>). 이후 이 모델로 생성하면 얼굴이 일관되게 유지돼요.
       </div>
+
+      <!-- Admin-only: create as system model (visible to all orgs) -->
+      <div id="systemModelOption" style="display:none;background:rgba(139,107,159,0.08);border:1px solid rgba(139,107,159,0.3);border-radius:8px;padding:12px;">
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="createAsSystemModel" style="margin-top:3px;" />
+          <div>
+            <div style="color:#8a6b9f;font-weight:500;font-size:13px;margin-bottom:4px;">⭐ <span data-i18n="label_system_model">Create as system model</span></div>
+            <div style="font-size:11.5px;color:var(--text-muted);line-height:1.5;">
+              <span data-i18n="hint_system_model">공용 모델로 생성하면 모든 브랜드에서 사용할 수 있어요. 이 옵션은 플랫폼 관리자만 사용 가능합니다.</span>
+            </div>
+          </div>
+        </label>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal('modelModal')" data-i18n="btn_cancel">취소</button>
@@ -3434,6 +3447,8 @@ const I18N = {
     label_ref_image: '레퍼런스 이미지 (선택)',
     ref_upload_bold: '사진 업로드',
     ref_upload_hint: '— 있으면 일관성이 훨씬 좋아져요',
+    label_system_model: '공용 모델로 생성',
+    hint_system_model: '공용 모델로 생성하면 모든 브랜드에서 사용할 수 있어요. 이 옵션은 플랫폼 관리자만 사용 가능합니다.',
     btn_save_model: '모델 저장 + 시트 생성',
     btn_ai_enrich: 'AI로 상세하게',
     label_age: '나이',
@@ -3685,6 +3700,8 @@ const I18N = {
     label_ref_image: 'Reference image (optional)',
     ref_upload_bold: 'Upload a photo',
     ref_upload_hint: '— helps consistency significantly',
+    label_system_model: 'Create as system model',
+    hint_system_model: 'System models are visible to all brands. Only platform admins can create these.',
     btn_save_model: 'Save model + generate sheet',
     btn_ai_enrich: 'AI enrich',
     label_age: 'Age range',
@@ -3822,6 +3839,7 @@ const state = {
   currentEditImage: null,
   editHistory: [],
   lastGeneration: null,
+  isPlatformAdmin: false,         // set during postLoginBoot from current user's role
 };
 
 // style label map (한글 → AI prompt용 영문)
@@ -4126,7 +4144,14 @@ function switchView(view, options = {}) {
   }
 
   // Trigger data loads
-  if (view === 'library') renderLibrary();
+  if (view === 'library') {
+    renderLibrary();
+    // If there are models still generating, refresh to pick up new state.
+    // loadFashionModels() also starts polling automatically.
+    if ((state.fashionModels || []).some(m => m.status === 'generating_sheet')) {
+      loadFashionModels();
+    }
+  }
   if (view === 'history') { loadGenerations().then(renderHistory); }
   if (view === 'insights' && typeof loadInsights === 'function') setTimeout(loadInsights, 50);
   if (view === 'storeProducts' && typeof loadStoreProducts === 'function') setTimeout(loadStoreProducts, 50);
@@ -5081,6 +5106,11 @@ function openCreateModelModal() {
   document.getElementById('modelRefUpload').innerHTML = `
     <svg class="ref-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
     <div class="ref-hint"><b>사진 업로드</b> — 있으면 일관성이 훨씬 좋아져요</div>`;
+  // Show/hide "Create as system model" option based on platform admin status
+  const sysOpt = document.getElementById('systemModelOption');
+  const sysCheckbox = document.getElementById('createAsSystemModel');
+  if (sysOpt) sysOpt.style.display = state.isPlatformAdmin ? 'block' : 'none';
+  if (sysCheckbox) sysCheckbox.checked = false;
   openModal('modelModal');
 }
 
@@ -5096,6 +5126,10 @@ async function saveModel() {
   const styleTagsRaw = document.getElementById('modelStyleTags').value.trim();
   const styleTags  = styleTagsRaw ? styleTagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   const refImage   = state.modelRefImage || null;
+
+  // Admin-only: read checkbox for system model creation
+  const systemCheckbox = document.getElementById('createAsSystemModel');
+  const isSystem = !!(state.isPlatformAdmin && systemCheckbox && systemCheckbox.checked);
 
   const btn = document.getElementById('saveModelBtn');
   const origText = btn.textContent;
@@ -5146,6 +5180,7 @@ async function saveModel() {
     const { model } = await MODLai.models.create({
       name, appearance, ageRange, gender, ethnicity, heightCm, styleTags,
       refImage,
+      isSystem,   // admin-only flag; backend rejects for non-admins
     });
 
     // 2. Close modal, add to library (as draft, then update when sheet generates)
@@ -5224,8 +5259,34 @@ async function loadFashionModels() {
     state.fashionModels = models || [];
     renderLibrary();
     refreshUseModelSelect();
+
+    // If any model is still generating, poll again in 15s until all are done
+    maybePollGeneratingModels();
   } catch (err) {
     console.warn('[models] list failed:', err);
+  }
+}
+
+// Auto-refresh when models are being generated so the UI updates without
+// requiring the user to manually reload. Stops polling once all models are
+// in a terminal state (ready/failed/draft).
+let _modelPollTimer = null;
+function maybePollGeneratingModels() {
+  const hasGenerating = (state.fashionModels || []).some(m => m.status === 'generating_sheet');
+  // Clear any existing timer
+  if (_modelPollTimer) { clearTimeout(_modelPollTimer); _modelPollTimer = null; }
+  if (hasGenerating) {
+    _modelPollTimer = setTimeout(() => {
+      _modelPollTimer = null;
+      // Only refetch if library view is still visible, to avoid unnecessary requests
+      const libraryActive = document.getElementById('view-library')?.classList.contains('active');
+      if (libraryActive) {
+        loadFashionModels();
+      } else {
+        // User left the library view; try again later when they come back
+        // (we don't aggressively refetch in the background)
+      }
+    }, 15000);  // 15 seconds between polls
   }
 }
 
@@ -5237,25 +5298,51 @@ function renderLibrary() {
       <span>${t('btn_new_model')}</span>
     </div>`;
   const cards = state.fashionModels.map(m => {
-    const imgSrc = m.primary_sheet_image_url || m.ref_image_url
-      || `https://picsum.photos/seed/${encodeURIComponent(m.name)}/400/500`;
+    // Pick image source with clear states:
+    //   ready      → saved character sheet image (or ref image fallback)
+    //   generating → visual placeholder (spinner), NOT a random photo
+    //   draft/failed → fallback ref image or generic placeholder
+    const isGenerating = m.status === 'generating_sheet';
+    const hasRealImage = m.primary_sheet_image_url || m.ref_image_url;
+    const imgSrc = hasRealImage
+      ? (m.primary_sheet_image_url || m.ref_image_url)
+      : null;  // No random picsum — show proper placeholder below
+
     const statusBadge = m.status === 'ready' ?
         `<span class="model-status ready">✓ ${m.sheet_count || 0} sheets</span>`
-      : m.status === 'generating_sheet' ?
-        `<span class="model-status pending"><span class="spinner" style="width:10px;height:10px;border-width:1.5px;display:inline-block;vertical-align:-1px;margin-right:4px;"></span>생성 중</span>`
+      : isGenerating ?
+        `<span class="model-status pending"><span class="spinner" style="width:10px;height:10px;border-width:1.5px;display:inline-block;vertical-align:-1px;margin-right:4px;"></span>${currentLang==='ko'?'생성 중':'Generating'}</span>`
       : m.status === 'failed' ?
-        `<span class="model-status failed">실패</span>`
+        `<span class="model-status failed">${currentLang==='ko'?'실패':'Failed'}</span>`
       : `<span class="model-status draft">draft</span>`;
-    const useCountLabel = m.use_count ? ` · ${m.use_count}회 사용` : '';
+    const systemBadge = m.is_system
+      ? `<span class="model-status" style="background:rgba(139,107,159,0.15);color:#8a6b9f;border:1px solid rgba(139,107,159,0.3);margin-left:4px;">⭐ ${currentLang==='ko'?'공용':'System'}</span>`
+      : '';
+    const useCountLabel = m.use_count ? ` · ${m.use_count}${currentLang==='ko'?'회 사용':' uses'}` : '';
+
+    // Render image section: real image vs placeholder
+    const imgSection = imgSrc
+      ? `<img class="model-card-img" src="${imgSrc}" alt="${escapeHtml(m.name)}" style="cursor:zoom-in;" onclick="openLightbox('${imgSrc}', '${escapeHtml(m.name)}')" />`
+      : `<div class="model-card-img" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-elev-2);color:var(--text-dim);gap:10px;">
+           ${isGenerating ? '<div class="spinner" style="width:24px;height:24px;border-width:2px;"></div>' : '<div style="font-size:32px;opacity:0.4;">👤</div>'}
+           <div style="font-size:11px;letter-spacing:0.02em;text-align:center;padding:0 12px;">${
+             isGenerating ? (currentLang==='ko'?'모델 생성 중…<br>1-2분 정도 걸려요':'Generating model…<br>Takes 1-2 minutes')
+             : m.status === 'failed' ? (currentLang==='ko'?'생성 실패':'Generation failed')
+             : (currentLang==='ko'?'아직 생성되지 않음':'Not yet generated')
+           }</div>
+         </div>`;
+
     return `
     <div class="model-card">
-      <img class="model-card-img" src="${imgSrc}" alt="${escapeHtml(m.name)}" style="cursor:zoom-in;" onclick="openLightbox('${imgSrc}', '${escapeHtml(m.name)}')" />
+      ${imgSection}
       <div class="model-card-body">
-        <div class="model-card-name">${escapeHtml(m.name)} ${statusBadge}</div>
+        <div class="model-card-name">${escapeHtml(m.name)} ${statusBadge}${systemBadge}</div>
         <div class="model-card-meta">${escapeHtml((m.appearance || '').slice(0, 60))}${m.appearance && m.appearance.length > 60 ? '…' : ''}${useCountLabel}</div>
         <div class="model-card-actions">
           <button class="model-card-btn primary" onclick="useModelInGenerate('${m.id}')" ${m.status !== 'ready' && !window.MODLAI_USE_MOCK ? 'disabled' : ''}>${currentLang==='ko'?'사용하기':'Use'}</button>
-          <button class="model-card-btn" onclick="deleteModel('${m.id}')">${currentLang==='ko'?'삭제':'Delete'}</button>
+          ${m.is_system && !state.isPlatformAdmin
+            ? `<button class="model-card-btn" disabled title="${currentLang==='ko'?'공용 모델은 관리자만 삭제할 수 있어요':'System models can only be deleted by platform admins'}" style="opacity:0.4;cursor:not-allowed;">${currentLang==='ko'?'삭제':'Delete'}</button>`
+            : `<button class="model-card-btn" onclick="deleteModel('${m.id}')">${currentLang==='ko'?'삭제':'Delete'}</button>`}
         </div>
       </div>
     </div>`;
@@ -5265,8 +5352,22 @@ function renderLibrary() {
 
 function refreshUseModelSelect() {
   const sel = document.getElementById('useModelSelect');
-  sel.innerHTML = '<option value="">— None (free composition) —</option>' +
-    state.fashionModels.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  const systemModels = state.fashionModels.filter(m => m.is_system);
+  const orgModels    = state.fashionModels.filter(m => !m.is_system);
+  const sysLabel = currentLang === 'ko' ? '⭐ 공용 모델' : '⭐ System models';
+  const orgLabel = currentLang === 'ko' ? '브랜드 모델' : 'Brand models';
+  let html = '<option value="">— None (free composition) —</option>';
+  if (systemModels.length) {
+    html += `<optgroup label="${sysLabel}">`
+      + systemModels.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('')
+      + '</optgroup>';
+  }
+  if (orgModels.length) {
+    html += `<optgroup label="${orgLabel}">`
+      + orgModels.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('')
+      + '</optgroup>';
+  }
+  sel.innerHTML = html;
   // Show/hide consistency hint based on current selection
   updateModelSelectHint();
   // Also bind change event once
@@ -8140,15 +8241,16 @@ async function postLoginBoot() {
     console.warn('[boot] load generations failed:', e);
   }
 
-  // Refresh credit display from current org + prime settings state
+  // Refresh credit display from current org + prime settings state + detect platform admin
   try {
-    const { organization } = await MODLai.organizations.current();
-    if (organization) {
-      state.credits = organization.credits_balance || 0;
+    const r = await MODLai.organizations.current();
+    state.isPlatformAdmin = !!r.isPlatformAdmin;
+    if (r.organization) {
+      state.credits = r.organization.credits_balance || 0;
       updateCreditDisplay();
       // Prime settingsState so the Settings view has data ready immediately
       if (typeof settingsState !== 'undefined') {
-        settingsState.org = organization;
+        settingsState.org = r.organization;
       }
     }
   } catch (e) { /* silent */ }
