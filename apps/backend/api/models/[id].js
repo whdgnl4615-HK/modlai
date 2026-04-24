@@ -27,14 +27,20 @@ export default async function handler(req, res) {
   if (!db) return errorResponse(res, 500, 'no_database', 'Database not configured');
 
   // Verify ownership
+  // Lookup: allow viewing either an org-owned model OR a system model (org_id NULL)
   const { data: model, error: lookupErr } = await db
     .from('fashion_models_full')
     .select('*')
     .eq('id', modelId)
-    .eq('org_id', orgId)
+    .or(`org_id.eq.${orgId},org_id.is.null`)
     .maybeSingle();
   if (lookupErr) return errorResponse(res, 500, 'query_failed', lookupErr.message);
   if (!model)     return errorResponse(res, 404, 'not_found', 'Model not found');
+
+  // Helper: check if user can modify this specific model
+  const isPlatformAdmin = user.role === 'admin';
+  const isSystemModel   = model.org_id === null;
+  const canModify       = isSystemModel ? isPlatformAdmin : true;  // org members can modify org models; only platform admins can modify system models
 
   // ─────────── GET ───────────
   if (effectiveMethod === 'GET') {
@@ -48,6 +54,10 @@ export default async function handler(req, res) {
 
   // ─────────── PATCH ───────────
   if (effectiveMethod === 'PATCH' || effectiveMethod === 'POST') {
+    if (!canModify) {
+      return errorResponse(res, 403, 'forbidden',
+        'System models can only be edited by platform admins');
+    }
     const body = await readJson(req);
     const patch = {};
     if (body.name !== undefined)        patch.name = body.name.trim();
@@ -61,13 +71,10 @@ export default async function handler(req, res) {
 
     // Only do PATCH if there are actual fields to update
     if (Object.keys(patch).length > 0) {
-      const { data, error } = await db
-        .from('fashion_models')
-        .update(patch)
-        .eq('id', modelId)
-        .eq('org_id', orgId)
-        .select('*')
-        .single();
+      // Build the update query — scope to org if org model, to null if system
+      let query = db.from('fashion_models').update(patch).eq('id', modelId);
+      query = isSystemModel ? query.is('org_id', null) : query.eq('org_id', orgId);
+      const { data, error } = await query.select('*').single();
       if (error) return errorResponse(res, 500, 'update_failed', error.message);
       return res.status(200).json({ model: data });
     }
@@ -79,11 +86,13 @@ export default async function handler(req, res) {
 
   // ─────────── DELETE (archive) ───────────
   if (effectiveMethod === 'DELETE') {
-    const { error } = await db
-      .from('fashion_models')
-      .update({ is_archived: true })
-      .eq('id', modelId)
-      .eq('org_id', orgId);
+    if (!canModify) {
+      return errorResponse(res, 403, 'forbidden',
+        'System models can only be deleted by platform admins');
+    }
+    let query = db.from('fashion_models').update({ is_archived: true }).eq('id', modelId);
+    query = isSystemModel ? query.is('org_id', null) : query.eq('org_id', orgId);
+    const { error } = await query;
     if (error) return errorResponse(res, 500, 'delete_failed', error.message);
     return res.status(200).json({ ok: true });
   }

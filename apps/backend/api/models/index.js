@@ -34,11 +34,13 @@ export default async function handler(req, res) {
   // ─────────── LIST ───────────
   if (req.method === 'GET') {
     if (!db) return res.status(200).json({ models: [] }); // demo mode
+    // Include both org-specific models AND system-wide models (org_id IS NULL)
     const { data, error } = await db
       .from('fashion_models_full')
       .select('*')
-      .eq('org_id', orgId)
+      .or(`org_id.eq.${orgId},org_id.is.null`)
       .eq('is_archived', false)
+      .order('is_system', { ascending: false })       // system models first
       .order('created_at', { ascending: false });
     if (error) return errorResponse(res, 500, 'query_failed', error.message);
     return res.status(200).json({ models: data || [] });
@@ -52,10 +54,19 @@ export default async function handler(req, res) {
       ageRange, gender, ethnicity, heightCm,
       styleTags = [], languages = [],
       refImage,
+      isSystem,                        // NEW — only honored for platform admins
     } = body;
 
     if (!name || !name.trim()) return errorResponse(res, 400, 'missing_name', 'name required');
     if (!appearance || !appearance.trim()) return errorResponse(res, 400, 'missing_appearance', 'appearance required');
+
+    // Determine whether to create as a system model.
+    // Only platform admins (users.role = 'admin' on Supabase) can do this.
+    const wantsSystem = isSystem === true;
+    const isPlatformAdmin = user.role === 'admin';
+    if (wantsSystem && !isPlatformAdmin) {
+      return errorResponse(res, 403, 'not_platform_admin', 'Only platform admins can create system-wide models');
+    }
 
     // Upload ref image if provided
     let refImageUrl = null;
@@ -78,7 +89,9 @@ export default async function handler(req, res) {
       return res.status(200).json({
         model: {
           id: 'demo-model-' + Date.now(),
-          user_id: user.userId, org_id: orgId,
+          user_id: user.userId,
+          org_id: wantsSystem ? null : orgId,
+          is_system: wantsSystem,
           name, appearance,
           ref_image_url: refImageUrl,
           status: 'draft',
@@ -91,7 +104,8 @@ export default async function handler(req, res) {
     }
 
     const insert = {
-      user_id: user.userId, org_id: orgId,
+      user_id: user.userId,
+      org_id: wantsSystem ? null : orgId,   // NULL org_id → system model
       name: name.trim(),
       appearance: appearance.trim(),
       age_range: ageRange || null,

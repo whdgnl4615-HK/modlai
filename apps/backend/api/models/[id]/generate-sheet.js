@@ -53,14 +53,29 @@ export default async function handler(req, res) {
   const db = await getSupabaseAdmin();
   if (!db) return errorResponse(res, 500, 'no_database', 'Database not configured');
 
-  const { data: model, error: lookupErr } = await db
-    .from('fashion_models')
-    .select('*')
-    .eq('id', modelId)
-    .eq('user_id', user.userId)
-    .maybeSingle();
+  // Lookup the model — match by user ownership OR if it's a system model and user is platform admin
+  const isPlatformAdmin = user.role === 'admin';
+  let modelQuery = db.from('fashion_models').select('*').eq('id', modelId);
+
+  const { data: model, error: lookupErr } = await modelQuery.maybeSingle();
   if (lookupErr) return errorResponse(res, 500, 'query_failed', lookupErr.message);
-  if (!model)     return errorResponse(res, 404, 'not_found', 'Model not found');
+  if (!model)    return errorResponse(res, 404, 'not_found', 'Model not found');
+
+  // Authorization:
+  //   - Org model: must be the creator (or co-member of same org)
+  //   - System model (org_id is null): must be platform admin
+  const isSystemModel = model.org_id === null;
+  if (isSystemModel) {
+    if (!isPlatformAdmin) {
+      return errorResponse(res, 403, 'forbidden', 'Only platform admins can generate sheets for system models');
+    }
+  } else {
+    // Keep existing behavior: require user to be the creator
+    if (model.user_id !== user.userId) {
+      return errorResponse(res, 403, 'forbidden', 'Not the model creator');
+    }
+  }
+
   if (model.status === 'ready' || model.status === 'generating_sheet') {
     // Allow re-generate; we'll clear old sheets
   }
@@ -114,7 +129,28 @@ export default async function handler(req, res) {
       const angle = angles[i];
       const anglePrompt = ANGLE_PROMPTS[angle] || `Full-body studio portrait, ${angle} angle.`;
 
-      const fullPrompt = `${enriched}\n\n${anglePrompt}\n\n${BASE_STYLE}\n\nImportant: Keep the exact same person/face across all shots. Same features, same hair, same skin tone, same body proportions.`;
+      // Build explicit subject line from the structured model fields as a safety net.
+      // This ensures the core identity (gender, age, ethnicity, height, hair, eye color)
+      // is always in the prompt even if the enriched text somehow got corrupted.
+      const subjectBits = [];
+      if (model.age_range) subjectBits.push(model.age_range);
+      if (model.ethnicity) subjectBits.push(model.ethnicity);
+      if (model.gender)    subjectBits.push(model.gender);
+      if (model.height_cm) subjectBits.push(`${model.height_cm}cm tall`);
+      const subjectLine = subjectBits.length
+        ? `Subject: a ${subjectBits.join(' ')}.`
+        : '';
+
+      const fullPrompt = [
+        subjectLine,
+        enriched,
+        '',
+        anglePrompt,
+        '',
+        BASE_STYLE,
+        '',
+        'CRITICAL: The subject is a single human matching the description above. Keep the exact same person/face across all shots in this series. Same features, same hair color, same eye color, same skin tone, same body proportions, same gender, same ethnicity, same age. The image must show this exact described person — not a different person, not a different gender, not a different ethnicity.',
+      ].filter(Boolean).join('\n');
 
       const parts = [{ text: fullPrompt }];
       if (seedImage) {
@@ -199,11 +235,24 @@ async function enrichAppearance(model) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const systemPrompt = `You are a fashion casting director. Given sparse model info, write a rich, specific visual description suitable for AI image generation.
-- Cover: age range, ethnicity, face shape, eye color/shape, hair color/length/style, skin tone, height, build, distinguishing features, typical expression
-- Keep it to one dense paragraph (max 100 words)
-- Be specific with physical details (AI models need specifics)
-- Do NOT include clothing or background — the model should be describable independent of outfit
-- Do NOT add made-up details if unsure; stay faithful to what was given
+
+CRITICAL RULES:
+- Start DIRECTLY with the description. No preamble, no title, no markdown.
+- DO NOT use markdown headers (#, ##), bullet points, or any formatting.
+- DO NOT write "Here is a description" or "Fashion Model Prompt" or any meta-commentary.
+- Output must be a single flowing paragraph of pure descriptive text only.
+
+Content to cover (weave into one paragraph):
+- Age range, ethnicity, face shape, eye color/shape
+- Hair color/length/style, skin tone
+- Height, build, distinguishing features, typical expression
+- MUST preserve every physical detail the user provided (age, gender, ethnicity, height, eye color, hair color)
+
+Constraints:
+- Maximum 100 words
+- Be specific with physical details (AI image models need specifics)
+- DO NOT include clothing or background — the model should be describable independent of outfit
+- DO NOT invent details that contradict user-provided info; if user says "brown hair brown eyes white female late 20s 170cm", your output MUST feature all those exact attributes
 - Write in English`;
 
   const attrs = [
@@ -221,14 +270,27 @@ async function enrichAppearance(model) {
     model: 'claude-haiku-4-5',
     max_tokens: 400,
     system: systemPrompt,
-    messages: [{ role: 'user', content: `Write the rich description:\n\n${attrs}` }],
+    messages: [{ role: 'user', content: `Write the rich description of this person, preserving ALL physical attributes mentioned:\n\n${attrs}` }],
   });
 
-  return msg.content
+  let text = msg.content
     .filter(b => b.type === 'text')
     .map(b => b.text)
     .join('')
     .trim();
+
+  // Defensive cleanup — strip any markdown that slipped through despite instructions.
+  // If Haiku starts with "# Fashion Model Prompt" or similar preamble,
+  // remove any leading markdown headers and common meta-commentary.
+  text = text
+    .replace(/^#{1,6}\s+[^\n]*\n+/g, '')                // leading markdown headers
+    .replace(/^\*{1,3}[^\n]+\*{1,3}\s*\n+/g, '')        // leading bold/italic
+    .replace(/^(Here('s| is)\s+(a\s+)?(rich\s+)?description[:.])\s*/i, '')
+    .replace(/^(Description[:.])\s*/i, '')
+    .replace(/^(Fashion Model Prompt[:.])\s*/i, '')
+    .trim();
+
+  return text;
 }
 
 function extractImageData(response) {

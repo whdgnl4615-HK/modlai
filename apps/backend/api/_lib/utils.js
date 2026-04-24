@@ -480,12 +480,13 @@ export async function getModelSheetAsRefImages(userId, modelId) {
   const admin = await getSupabaseAdmin();
   if (!admin || !modelId) return null;
 
-  // Verify ownership
+  // Look up the model — either owned by this user or a system model (org_id IS NULL).
+  // System models are usable by any authenticated user.
   const { data: model } = await admin
     .from('fashion_models')
-    .select('id, enriched_appearance, appearance, status')
+    .select('id, enriched_appearance, appearance, status, org_id, user_id')
     .eq('id', modelId)
-    .eq('user_id', userId)
+    .or(`user_id.eq.${userId},org_id.is.null`)
     .maybeSingle();
   if (!model) return null;
 

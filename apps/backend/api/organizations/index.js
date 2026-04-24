@@ -27,7 +27,12 @@ export default async function handler(req, res) {
 
   // GET — return user's active org
   if (req.method === 'GET') {
-    if (!user.orgId) return res.status(200).json({ organization: null });
+    if (!user.orgId) {
+      return res.status(200).json({
+        organization: null,
+        isPlatformAdmin: !!user.isPlatformAdmin,
+      });
+    }
 
     const { data: org } = await db
       .from('organizations_with_stats')
@@ -37,6 +42,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       organization: org ? { ...org, role: user.orgRole } : null,
+      isPlatformAdmin: !!user.isPlatformAdmin,
     });
   }
 
