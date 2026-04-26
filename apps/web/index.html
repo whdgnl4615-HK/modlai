@@ -5897,11 +5897,11 @@ async function applyManualCrop() {
     return;
   }
 
-  // Update edit image to the cropped data URL — instant, no AI, no credits
+  // Update edit image to the cropped data URL — instant local preview
   state.currentEditImage = {
     url: dataUrl,
     id: 'crop_' + Date.now(),
-    generationId: null,  // local-only until user does an AI edit on top
+    generationId: null,  // will be set after backend save
   };
   state.editHistory.unshift({
     prompt: `[Manual crop ${cropState.ratio || 'free'}] ${sw}×${sh}`,
@@ -5913,6 +5913,50 @@ async function applyManualCrop() {
   cancelManualCrop();
   renderEditCanvas();
   toast(currentLang==='ko' ? `크롭 완료 · ${sw}×${sh}px` : `Cropped · ${sw}×${sh}px`, 'success');
+
+  // ─── Persist to DB so the crop shows up in History (no credits charged) ───
+  // We do this in the background — the user already sees the cropped result
+  // immediately. If the save fails, the crop still works locally; we just
+  // toast a soft warning rather than rolling back.
+  if (!window.MODLAI_USE_MOCK) {
+    (async () => {
+      try {
+        const sourceGenId = state.editHistory[1]?.generationId
+                         || state.currentEditImage?.previousGenerationId
+                         || null;
+        const res = await MODLai.edit({
+          mode: 'crop',
+          imageUrl: dataUrl,
+          sourceGenerationId: sourceGenId,
+          cropInfo: { ratio: cropState.ratio || 'free', width: sw, height: sh },
+        });
+        if (res?.imageUrl) {
+          // Switch the local image reference to the persisted https URL so
+          // future edits don't re-upload the same data URL.
+          if (state.currentEditImage && state.currentEditImage.url === dataUrl) {
+            state.currentEditImage.url = res.imageUrl;
+            state.currentEditImage.generationId = res.generationId || null;
+            renderEditCanvas();
+          }
+          // Update the most recent edit-history entry with the saved URL
+          if (state.editHistory[0] && state.editHistory[0].imageUrl === dataUrl) {
+            state.editHistory[0].imageUrl = res.imageUrl;
+            state.editHistory[0].generationId = res.generationId || null;
+          }
+        }
+        // Refresh global History so the new crop appears there too
+        loadGenerations().catch(() => { /* silent */ });
+      } catch (err) {
+        console.warn('[crop:save] persistence failed (crop still usable locally):', err);
+        toast(
+          currentLang==='ko'
+            ? '크롭 저장에 실패했어요 (편집은 가능)'
+            : 'Could not save crop to history (edit still works)',
+          'info'
+        );
+      }
+    })();
+  }
 }
 
 async function applyEdit() {
