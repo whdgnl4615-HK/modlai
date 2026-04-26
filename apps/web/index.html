@@ -107,13 +107,18 @@
     font-size: 13.5px;
     transition: all 0.15s ease;
     border: 1px solid transparent;
+    /* Reset anchor defaults so <a class="nav-item"> looks identical */
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  .nav-item:hover { background: var(--bg-hover); color: var(--text); }
+  .nav-item:hover, .nav-item:focus { background: var(--bg-hover); color: var(--text); text-decoration: none; outline: none; }
+  .nav-item:visited { color: var(--text-muted); }
   .nav-item.active {
     background: var(--bg-card);
     color: var(--text);
     border-color: var(--border-strong);
   }
+  .nav-item.active:visited { color: var(--text); }
   .nav-icon { width: 18px; height: 18px; stroke-width: 1.5; flex-shrink: 0; }
 
   .credit-card {
@@ -2157,40 +2162,40 @@
 
     <nav class="nav">
       <div class="nav-section-label" data-i18n="studio">Studio</div>
-      <div class="nav-item active" data-view="generate">
+      <a class="nav-item active" data-view="generate" href="#/generate">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/></svg>
         <span data-i18n="nav_generate">Generate</span>
-      </div>
-      <div class="nav-item" data-view="edit">
+      </a>
+      <a class="nav-item" data-view="edit" href="#/edit">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         <span data-i18n="nav_edit">Edit</span>
-      </div>
-      <div class="nav-item" data-view="library">
+      </a>
+      <a class="nav-item" data-view="library" href="#/library">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
         <span data-i18n="nav_models">Models</span>
-      </div>
-      <div class="nav-item" data-view="history">
+      </a>
+      <a class="nav-item" data-view="history" href="#/history">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
         <span data-i18n="nav_history">History</span>
-      </div>
+      </a>
       <div class="nav-sep"></div>
-      <div class="nav-item" data-view="insights">
+      <a class="nav-item" data-view="insights" href="#/insights">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 6-6"/></svg>
         <span data-i18n="nav_insights">Insights</span>
-      </div>
-      <div class="nav-item" data-view="storeProducts">
+      </a>
+      <a class="nav-item" data-view="storeProducts" href="#/storeProducts">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 7l-8 5-8-5"/><rect x="4" y="7" width="16" height="13" rx="1"/><path d="M9 3h6v4H9z"/></svg>
         <span data-i18n="nav_store_products">Store Products</span>
-      </div>
-      <div class="nav-item" data-view="catalog">
+      </a>
+      <a class="nav-item" data-view="catalog" href="#/catalog">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         <span data-i18n="nav_catalog">Catalog</span>
-      </div>
+      </a>
       <div class="nav-sep"></div>
-      <div class="nav-item" data-view="settings">
+      <a class="nav-item" data-view="settings" href="#/settings">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span data-i18n="settings_nav">Settings</span>
-      </div>
+      </a>
     </nav>
 
     <div class="credit-card">
@@ -4397,15 +4402,29 @@ function switchView(view, options = {}) {
   if (view === 'settings' && typeof loadSettings === 'function') setTimeout(loadSettings, 50);
 }
 
-// Nav click → switchView
+// Nav click → switchView (but let cmd/ctrl/middle-click open in new tab natively)
 document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => switchView(item.dataset.view));
+  item.addEventListener('click', (e) => {
+    // If user wants to open in new tab/window/etc, don't intercept — the
+    // browser's native anchor behavior handles it (new tab gets a fresh
+    // page with the right hash, same-tab just SPA-switches).
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) {
+      return;  // native browser behavior handles it
+    }
+    if (e.button !== undefined && e.button !== 0) return; // only main button
+    e.preventDefault();
+    switchView(item.dataset.view);
+  });
+  // Auxclick (middle-click on most browsers) — also let native handle it.
+  // No interception needed; the absence of e.preventDefault() above is enough.
 });
 
 // Handle browser back/forward + initial URL
 function handleRouteFromUrl(fromPopState = false) {
   const hash = window.location.hash || '';
-  const match = hash.match(/^#\/([a-zA-Z]+)/);
+  // Accept both #view and #/view formats — the anchor href uses the
+  // shorter form, while pushState writes the prefixed form.
+  const match = hash.match(/^#\/?([a-zA-Z]+)/);
   const view = match ? match[1] : 'generate';
   // Only switch if valid view
   if (document.getElementById('view-' + view)) {
@@ -9175,6 +9194,14 @@ async function postLoginBoot() {
       }
     }
   } catch (e) { /* silent */ }
+
+  // Re-apply URL routing now that we're authenticated and views are ready.
+  // This makes deep-linked tabs (opened via cmd-click → new tab) land on the
+  // right view with data fully loaded. The earlier DOMContentLoaded route was
+  // best-effort; this is the authoritative one.
+  if (window.location.hash) {
+    handleRouteFromUrl(true);
+  }
 }
 
 // Kick off auth on page load
