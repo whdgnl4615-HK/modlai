@@ -3478,7 +3478,7 @@ const I18N = {
     crop_landscape: '16:9 가로',
     crop_3_4: '3:4',
     btn_crop_apply: '크롭 적용 (무료)',
-    btn_crop_cancel: '취소',
+    btn_crop_cancel: '취소 (ESC)',
     label_edit_history: '편집 기록',
     edit_history_empty: '편집 기록이 여기에 쌓여요',
     // Library
@@ -3756,7 +3756,7 @@ const I18N = {
     crop_landscape: '16:9 Landscape',
     crop_3_4: '3:4',
     btn_crop_apply: 'Apply Crop (free)',
-    btn_crop_cancel: 'Cancel',
+    btn_crop_cancel: 'Cancel (ESC)',
     label_edit_history: 'Edit history',
     edit_history_empty: 'Edits will be logged here',
     btn_new_model: 'Create new model',
@@ -5659,6 +5659,20 @@ function cancelManualCrop() {
   document.getElementById('manualCropActions').style.display = 'none';
   document.querySelectorAll('.manual-crop-chip').forEach(c => c.classList.remove('active'));
 }
+
+// Press ESC to cancel an active manual crop. Only intercepts when crop is
+// active so that ESC continues to work normally elsewhere (closing modals,
+// blurring inputs, etc.).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!cropState.active) return;
+  // Don't fight other ESC handlers if a modal is currently open
+  const anyModalOpen = document.querySelector('.modal-overlay.active');
+  if (anyModalOpen) return;
+  e.preventDefault();
+  cancelManualCrop();
+  toast(currentLang === 'ko' ? '크롭 취소됨' : 'Crop cancelled', 'info');
+});
 
 async function applyManualCrop() {
   if (!cropState.active || !cropState.rect || !cropState.imgEl) {
