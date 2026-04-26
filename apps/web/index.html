@@ -1685,6 +1685,54 @@
     border-radius: 8px;
   }
 
+  /* ─── Edit canvas action toolbar (above the image) ─── */
+  .edit-canvas-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+  }
+  .edit-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 11px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .edit-toolbar-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .edit-toolbar-btn-ghost {
+    color: var(--text-muted);
+  }
+  .edit-toolbar-btn-ghost:hover {
+    border-color: #c4603a;
+    color: #c4603a;
+  }
+  .edit-toolbar-btn svg {
+    flex-shrink: 0;
+  }
+  /* Hide labels on narrow viewports — keep just icons */
+  @media (max-width: 700px) {
+    .edit-toolbar-btn span { display: none; }
+    .edit-toolbar-btn { padding: 8px 10px; }
+  }
+
   /* ─── Manual crop overlay ─── */
   .crop-canvas-host {
     position: relative;
@@ -5204,8 +5252,98 @@ function renderEditCanvas() {
   const wrap = document.getElementById('editCanvasWrap');
   if (!state.currentEditImage) return;
   const url = state.currentEditImage.url;
-  wrap.innerHTML = `<img src="${url}" class="edit-canvas" style="cursor:zoom-in;" onclick="openLightbox('${url}', '${currentLang==='ko'?'편집 중':'Editing'}')" />`;
+  // crossorigin="anonymous" lets canvas.toDataURL() work on cross-origin
+  // images (Supabase storage URLs). Data URLs don't need this attribute.
+  const isDataUrl = url.startsWith('data:');
+  const corsAttr = isDataUrl ? '' : 'crossorigin="anonymous"';
+  const lbCaption = currentLang==='ko' ? '편집 중' : 'Editing';
+
+  const labelNew      = currentLang==='ko' ? '다른 이미지' : 'Other image';
+  const labelDownload = currentLang==='ko' ? '다운로드'    : 'Download';
+  const labelClose    = currentLang==='ko' ? '닫기'        : 'Close';
+
+  wrap.innerHTML = `
+    <div class="edit-canvas-toolbar">
+      <button class="edit-toolbar-btn" onclick="document.getElementById('editFile').click()" title="${labelNew}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>${labelNew}</span>
+      </button>
+      <button class="edit-toolbar-btn" onclick="downloadCurrentEditImage()" title="${labelDownload}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>${labelDownload}</span>
+      </button>
+      <button class="edit-toolbar-btn edit-toolbar-btn-ghost" onclick="closeEditImage()" title="${labelClose}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span>${labelClose}</span>
+      </button>
+    </div>
+    <img src="${url}" ${corsAttr} class="edit-canvas" style="cursor:zoom-in;" onclick="openLightbox('${url}', '${lbCaption}')" />
+  `;
   renderEditHistory();
+}
+
+function closeEditImage() {
+  // Cancel any active crop operation first
+  if (cropState.active) cancelManualCrop();
+
+  state.currentEditImage = null;
+  state.editHistory = [];
+
+  // Restore the empty state. Re-using the original markup so drag-drop and
+  // the upload button keep working.
+  const wrap = document.getElementById('editCanvasWrap');
+  wrap.innerHTML = `
+    <div class="edit-empty">
+      <svg style="width:48px;height:48px;margin:0 auto 14px;color:var(--text-dim)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <div style="font-family:var(--font-display);font-size:22px;margin-bottom:6px;color:var(--text)">${currentLang==='ko'?'편집할 이미지를 선택하세요':'Pick an image to edit'}</div>
+      <div>${currentLang==='ko'?'History에서 이미지를 열거나, 업로드하거나, 여기에 드래그해보세요.':'Open from History, upload, or drag here.'}</div>
+      <button class="btn btn-primary" style="margin-top:20px" onclick="document.getElementById('editFile').click()">${currentLang==='ko'?'이미지 업로드':'Upload image'}</button>
+    </div>
+  `;
+  // Reset the file input so re-selecting the same file fires onchange
+  const fileInput = document.getElementById('editFile');
+  if (fileInput) fileInput.value = '';
+  renderEditHistory();
+}
+
+async function downloadCurrentEditImage() {
+  if (!state.currentEditImage) return;
+  const url = state.currentEditImage.url;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `modlai-edit-${ts}.png`;
+
+  try {
+    let blob;
+    if (url.startsWith('data:')) {
+      // Convert data URL to Blob
+      const resp = await fetch(url);
+      blob = await resp.blob();
+    } else {
+      // https URL — fetch with CORS
+      const resp = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (!resp.ok) throw new Error('fetch ' + resp.status);
+      blob = await resp.blob();
+    }
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    toast(currentLang==='ko' ? '다운로드 시작' : 'Download started', 'success');
+  } catch (err) {
+    console.error('[download] failed:', err);
+    // Fallback: just open the URL in a new tab so the user can right-click → save
+    window.open(url, '_blank');
+    toast(
+      currentLang==='ko'
+        ? '새 탭에서 열렸어요 — 우클릭하여 저장하세요'
+        : 'Opened in a new tab — right-click to save',
+      'info'
+    );
+  }
 }
 
 function renderEditHistory() {
@@ -5690,47 +5828,72 @@ async function applyManualCrop() {
   const sw = Math.round(r.w * scaleX);
   const sh = Math.round(r.h * scaleY);
 
-  // Draw to canvas
-  const canvas = document.createElement('canvas');
-  canvas.width = sw;
-  canvas.height = sh;
-  const ctx = canvas.getContext('2d');
+  const sourceUrl = state.currentEditImage.url;
+  let dataUrl = null;
 
-  // For cross-origin images (Supabase URLs), we may need to load via fetch first
-  // because canvas.toDataURL throws on tainted canvas.
-  let drawImg = img;
-  let needsFetch = false;
+  // ─── Strategy A: Direct draw ───
+  // Works if image was loaded with crossorigin="anonymous" and Supabase
+  // returned the right CORS headers. This is the fast path.
   try {
+    const canvas = document.createElement('canvas');
+    canvas.width = sw; canvas.height = sh;
+    const ctx = canvas.getContext('2d');
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    canvas.toDataURL('image/png'); // probe
-  } catch (e) {
-    // Tainted — re-fetch via blob URL
-    needsFetch = true;
+    dataUrl = canvas.toDataURL('image/png');
+  } catch (err) {
+    console.warn('[crop] direct draw tainted, falling back to fetch:', err.message);
+    dataUrl = null;
   }
 
-  if (needsFetch) {
+  // ─── Strategy B: Fetch as blob and re-load ───
+  // Triggered when image was loaded without crossorigin (legacy state) or
+  // Supabase didn't return CORS headers on the original GET. Blob URLs are
+  // same-origin to the document, so the canvas won't be tainted.
+  if (!dataUrl) {
+    if (sourceUrl.startsWith('data:')) {
+      // data URL fallback shouldn't happen — data URLs are never tainted.
+      // If we got here, something else is wrong; surface it to the user.
+      toast(currentLang==='ko' ? '크롭 처리 실패' : 'Crop processing failed', 'error');
+      return;
+    }
     try {
-      const resp = await fetch(state.currentEditImage.url);
+      const resp = await fetch(sourceUrl, { mode: 'cors', credentials: 'omit' });
+      if (!resp.ok) throw new Error('fetch ' + resp.status);
       const blob = await resp.blob();
       const blobUrl = URL.createObjectURL(blob);
-      drawImg = new Image();
-      drawImg.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
-        drawImg.onload = resolve;
-        drawImg.onerror = reject;
-        drawImg.src = blobUrl;
+
+      const reload = new Image();
+      // Don't set crossOrigin here — blob URLs are same-origin so it's
+      // unnecessary and can in some browsers cause an extra CORS check.
+      const loaded = new Promise((resolve, reject) => {
+        reload.onload  = resolve;
+        reload.onerror = () => reject(new Error('blob image load failed'));
       });
-      // Recompute since natural sizes should match
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(drawImg, sx, sy, sw, sh, 0, 0, sw, sh);
+      reload.src = blobUrl;
+      await loaded;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = sw; canvas.height = sh;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(reload, sx, sy, sw, sh, 0, 0, sw, sh);
+      dataUrl = canvas.toDataURL('image/png');
       URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      toast((currentLang==='ko'?'크롭 실패: ':'Crop failed: ') + err.message, 'error');
+      console.error('[crop] fetch fallback failed:', err);
+      toast(
+        currentLang==='ko'
+          ? '크롭 실패 — 이미지를 다시 업로드 후 시도해 주세요'
+          : 'Crop failed — please re-upload the image and try again',
+        'error'
+      );
       return;
     }
   }
 
-  const dataUrl = canvas.toDataURL('image/png');
+  if (!dataUrl) {
+    toast(currentLang==='ko' ? '크롭 처리 실패' : 'Crop processing failed', 'error');
+    return;
+  }
 
   // Update edit image to the cropped data URL — instant, no AI, no credits
   state.currentEditImage = {
