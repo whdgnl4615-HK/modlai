@@ -1661,17 +1661,128 @@
     min-height: 500px;
     display: flex; align-items: center; justify-content: center;
     position: relative;
+    transition: all 0.15s ease;
+  }
+  .edit-canvas-wrap.dragover {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .edit-canvas-wrap.dragover::after {
+    content: '📥 ' attr(data-drop-label);
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(45,90,53,0.1);
+    color: var(--accent);
+    font-size: 18px; font-weight: 600;
+    border-radius: 14px;
+    pointer-events: none;
   }
   .edit-canvas {
     max-width: 100%;
     max-height: 600px;
     border-radius: 8px;
   }
+
+  /* ─── Manual crop overlay ─── */
+  .crop-canvas-host {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+    user-select: none;
+  }
+  .crop-canvas-host .edit-canvas {
+    cursor: crosshair !important;
+    display: block;
+  }
+  .crop-overlay {
+    position: absolute;
+    border: 2px dashed #fff;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.4) inset;
+    cursor: move;
+    box-sizing: border-box;
+  }
+  .crop-overlay-handle {
+    position: absolute;
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+  }
+  .crop-overlay-handle.tl { top: -7px; left: -7px; cursor: nwse-resize; }
+  .crop-overlay-handle.tr { top: -7px; right: -7px; cursor: nesw-resize; }
+  .crop-overlay-handle.bl { bottom: -7px; left: -7px; cursor: nesw-resize; }
+  .crop-overlay-handle.br { bottom: -7px; right: -7px; cursor: nwse-resize; }
+  .crop-info {
+    position: absolute;
+    top: -28px; left: 0;
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    pointer-events: none;
+  }
+
   .edit-empty {
     text-align: center;
     color: var(--text-muted);
   }
   .edit-panel .field { margin-bottom: 16px; }
+
+  /* ─── Edit preset tabs + grid ─── */
+  .edit-preset-tabs {
+    display: flex; flex-wrap: wrap; gap: 2px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .edit-preset-tab {
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    font-family: inherit;
+    margin-bottom: -1px;
+  }
+  .edit-preset-tab:hover { color: var(--text); }
+  .edit-preset-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 500;
+  }
+  .edit-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px 2px;
+  }
+  .edit-preset-card {
+    padding: 8px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    font-size: 11.5px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    line-height: 1.3;
+  }
+  .edit-preset-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+  .edit-preset-card .epc-icon { font-size: 13px; margin-right: 4px; }
   .edit-history {
     max-height: 200px;
     overflow-y: auto;
@@ -2223,6 +2334,14 @@
                 </div>
                 <div class="model-cost"><b>30</b> cr</div>
               </div>
+              <div class="model-option" data-model="nanobanana2">
+                <div class="model-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <div class="model-info">
+                  <div class="model-name"><span data-i18n="tier_premium_name">Premium</span> <span class="model-badge" style="background:rgba(212,165,68,0.15);color:#c89b3c;border:1px solid rgba(212,165,68,0.3);" data-i18n="tier_premium_badge">Best face consistency</span></div>
+                  <div class="model-desc" data-i18n="tier_premium_desc">Nano Banana 2 · sharper details, photorealistic skin, better same-face across shots</div>
+                </div>
+                <div class="model-cost"><b>40</b> cr</div>
+              </div>
               <div class="model-option selected" data-model="openai">
                 <div class="model-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                 <div class="model-info">
@@ -2301,33 +2420,57 @@
       </header>
 
       <div class="edit-layout">
-        <div class="edit-canvas-wrap" id="editCanvasWrap">
+        <!-- LEFT: Canvas with drag-drop + manual crop overlay -->
+        <div class="edit-canvas-wrap" id="editCanvasWrap"
+             ondragover="handleEditDragOver(event)"
+             ondragleave="handleEditDragLeave(event)"
+             ondrop="handleEditDrop(event)">
           <div class="edit-empty">
             <svg style="width:48px;height:48px;margin:0 auto 14px;color:var(--text-dim)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             <div style="font-family:var(--font-display);font-size:22px;margin-bottom:6px;color:var(--text)" data-i18n="edit_empty_title">편집할 이미지를 선택하세요</div>
-            <div data-i18n="edit_empty_desc">History에서 이미지를 열거나 새로 업로드할 수 있어요.</div>
+            <div data-i18n="edit_empty_desc">History에서 이미지를 열거나, 업로드하거나, 여기에 드래그해보세요.</div>
             <button class="btn btn-primary" style="margin-top:20px" onclick="document.getElementById('editFile').click()"><span data-i18n="btn_upload_image">이미지 업로드</span></button>
             <input type="file" id="editFile" accept="image/*" style="display:none" onchange="loadEditImage(event)" />
           </div>
         </div>
 
+        <!-- RIGHT: Edit instructions panel -->
         <div class="panel edit-panel">
           <div class="panel-title" data-i18n="edit_panel_title">Edit instructions</div>
           <div class="panel-sub" data-i18n="edit_panel_sub">자연어로 어떻게 바꾸고 싶은지 설명하세요.</div>
 
+          <!-- Manual Crop Tool (instant, no AI) -->
           <div class="field">
-            <label class="field-label" data-i18n="label_edit_prompt">수정 내용</label>
-            <textarea class="textarea" id="editPrompt" data-i18n-placeholder="ph_edit_prompt" placeholder="예: 배경을 파리 거리로 바꾸고 조명을 골든아워로..."></textarea>
+            <label class="field-label" data-i18n="label_manual_crop">✂️ Manual Crop (즉시, 무료)</label>
+            <div class="chip-row" id="manualCropChips">
+              <div class="chip manual-crop-chip" data-crop-ratio="free" data-i18n="crop_free">자유</div>
+              <div class="chip manual-crop-chip" data-crop-ratio="1:1" data-i18n="crop_square">1:1 정사각</div>
+              <div class="chip manual-crop-chip" data-crop-ratio="4:5" data-i18n="crop_portrait">4:5 세로</div>
+              <div class="chip manual-crop-chip" data-crop-ratio="9:16" data-i18n="crop_story">9:16 스토리</div>
+              <div class="chip manual-crop-chip" data-crop-ratio="16:9" data-i18n="crop_landscape">16:9 가로</div>
+              <div class="chip manual-crop-chip" data-crop-ratio="3:4" data-i18n="crop_3_4">3:4</div>
+            </div>
+            <div id="manualCropActions" style="display:none;gap:8px;margin-top:8px;">
+              <button class="btn btn-primary" style="flex:1;font-size:12px;padding:8px 12px;" onclick="applyManualCrop()" data-i18n="btn_crop_apply">크롭 적용 (무료)</button>
+              <button class="btn btn-ghost" style="flex:1;font-size:12px;padding:8px 12px;" onclick="cancelManualCrop()" data-i18n="btn_crop_cancel">취소</button>
+            </div>
           </div>
 
           <div class="field">
-            <label class="field-label" data-i18n="label_quick">Quick actions</label>
-            <div class="chip-row">
-              <div class="chip" onclick="quickEdit(t('qe_remove_bg'))" data-i18n="qe_btn_remove_bg">배경 제거</div>
-              <div class="chip" onclick="quickEdit(t('qe_golden'))" data-i18n="qe_btn_golden">골든아워</div>
-              <div class="chip" onclick="quickEdit(t('qe_film'))" data-i18n="qe_btn_film">필름 룩</div>
-              <div class="chip" onclick="quickEdit(t('qe_detail'))" data-i18n="qe_btn_detail">디테일 ↑</div>
-            </div>
+            <label class="field-label">
+              <span data-i18n="label_edit_prompt">수정 내용</span>
+              <button type="button" class="refine-btn" style="float:right;font-size:10.5px;padding:4px 8px;" onclick="refineEditPrompt()">
+                ✨ <span data-i18n="btn_refine_edit">Claude로 개선</span>
+              </button>
+            </label>
+            <textarea class="textarea" id="editPrompt" data-i18n-placeholder="ph_edit_prompt" placeholder="예: 배경을 파리 거리로 바꾸고 조명을 골든아워로..."></textarea>
+          </div>
+
+          <!-- AI Edit Presets — categorized -->
+          <div class="field">
+            <label class="field-label" data-i18n="label_quick">⚡ Quick AI edits (30 cr)</label>
+            <div class="edit-preset-tabs" id="editPresetTabs"></div>
+            <div class="edit-preset-grid" id="editPresetGrid"></div>
           </div>
 
           <button class="generate-btn" onclick="applyEdit()">
@@ -3326,10 +3469,29 @@ const I18N = {
     qe_btn_film: '필름 룩', qe_film: '색감을 필름 카메라로 촬영한 듯 보정해주세요',
     qe_btn_detail: '디테일 ↑', qe_detail: '얼굴/피부 디테일을 향상시키되 자연스럽게',
     btn_apply_edit: '적용하기',
+    btn_refine_edit: 'Claude로 개선',
+    label_manual_crop: '✂️ 수동 크롭 (즉시, 무료)',
+    crop_free: '자유',
+    crop_square: '1:1 정사각',
+    crop_portrait: '4:5 세로',
+    crop_story: '9:16 스토리',
+    crop_landscape: '16:9 가로',
+    crop_3_4: '3:4',
+    btn_crop_apply: '크롭 적용 (무료)',
+    btn_crop_cancel: '취소',
     label_edit_history: '편집 기록',
     edit_history_empty: '편집 기록이 여기에 쌓여요',
     // Library
     btn_new_model: '새 모델 만들기',
+    hint_model_consistency: '얼굴 일관성은 High Quality (Nanobanana)에서 가장 좋아요. Creative와 Editorial은 얼굴이 조금 바뀔 수 있어요.',
+    settings_subtitle: '조직, 멤버, 채널, 결제 설정.',
+    settings_tab_org: '조직',
+    settings_tab_members: '멤버',
+    settings_tab_channels: '채널',
+    settings_tab_billing: '결제',
+    link_master_title: '카탈로그에 연결',
+    link_master_sub: '이 이미지를 어느 상품에 연결할지 선택하세요.',
+    label_search_product: '상품 검색',
     empty_hist_title: '아직 기록이 없어요',
     empty_hist_desc: 'Generate 탭에서 첫 이미지를 만들어 보세요.',
     // Modal - top up
@@ -3408,6 +3570,9 @@ const I18N = {
     tier_high_name: 'High Quality',
     tier_high_badge: '편집 최적',
     tier_high_desc: '디테일 보존력 최고 · 편집/캐릭터 시트에 최적',
+    tier_premium_name: 'Premium',
+    tier_premium_badge: '얼굴 일관성 최고',
+    tier_premium_desc: 'Nano Banana 2 · 더 선명한 디테일, 사실적인 피부, 같은 얼굴 일관성 향상',
     tier_creative_name: 'Creative',
     tier_creative_badge: '가장 창의적',
     tier_creative_desc: '프롬프트 해석력 최고 · 콘셉트 컷/마케팅 비주얼에 최적',
@@ -3582,9 +3747,28 @@ const I18N = {
     qe_btn_film: 'Film look', qe_film: 'Color-grade like it was shot on film',
     qe_btn_detail: 'Detail ↑', qe_detail: 'Enhance face/skin detail but keep it natural',
     btn_apply_edit: 'Apply',
+    btn_refine_edit: 'Refine with Claude',
+    label_manual_crop: '✂️ Manual Crop (instant, free)',
+    crop_free: 'Free',
+    crop_square: '1:1 Square',
+    crop_portrait: '4:5 Portrait',
+    crop_story: '9:16 Story',
+    crop_landscape: '16:9 Landscape',
+    crop_3_4: '3:4',
+    btn_crop_apply: 'Apply Crop (free)',
+    btn_crop_cancel: 'Cancel',
     label_edit_history: 'Edit history',
     edit_history_empty: 'Edits will be logged here',
     btn_new_model: 'Create new model',
+    hint_model_consistency: 'Face consistency is best with High Quality (Nanobanana). Creative and Editorial may shift faces slightly.',
+    settings_subtitle: 'Organization, members, channels, and billing.',
+    settings_tab_org: 'Organization',
+    settings_tab_members: 'Members',
+    settings_tab_channels: 'Channels',
+    settings_tab_billing: 'Billing',
+    link_master_title: 'Link to catalog',
+    link_master_sub: 'Choose which product to link this image to.',
+    label_search_product: 'Search product',
     empty_hist_title: 'No history yet',
     empty_hist_desc: 'Make your first image from the Generate tab.',
     modal_topup_1: 'Top up',
@@ -3662,6 +3846,9 @@ const I18N = {
     tier_high_name: 'High Quality',
     tier_high_badge: 'Best for editing',
     tier_high_desc: 'Most consistent detail preservation · best for edits & character sheets',
+    tier_premium_name: 'Premium',
+    tier_premium_badge: 'Best face consistency',
+    tier_premium_desc: 'Nano Banana 2 · sharper details, photorealistic skin, better same-face across shots',
     tier_creative_name: 'Creative',
     tier_creative_badge: 'Most artistic',
     tier_creative_desc: 'Highest prompt creativity · best for concept shots & marketing visuals',
@@ -4111,10 +4298,11 @@ const CATEGORY_LABELS = {
 
 // model config — public labels abstract the underlying provider
 const AI_MODELS = {
-  nanobanana: { name: 'High Quality', fullName: 'High quality tier', cost: 30, color: '#2d5a35' },
-  openai:     { name: 'Creative',     fullName: 'Creative tier',     cost: 50, color: '#6b7fb5' },
-  stability:  { name: 'Fast',         fullName: 'Fast tier',         cost: 20, color: '#c4603a' },
-  edit:       { name: 'Edited',       fullName: 'Edit result',       cost: 30, color: '#8a6b9f' },
+  nanobanana:  { name: 'High Quality', fullName: 'High quality tier',          cost: 30, color: '#2d5a35' },
+  nanobanana2: { name: 'Premium',      fullName: 'Premium tier · Nano Banana 2', cost: 40, color: '#d4a544' },
+  openai:      { name: 'Creative',     fullName: 'Creative tier',              cost: 50, color: '#6b7fb5' },
+  stability:   { name: 'Fast',         fullName: 'Fast tier',                  cost: 20, color: '#c4603a' },
+  edit:        { name: 'Edited',       fullName: 'Edit result',                cost: 30, color: '#8a6b9f' },
 };
 
 // ================================================================
@@ -5036,6 +5224,516 @@ function renderEditHistory() {
 
 function quickEdit(p) {
   document.getElementById('editPrompt').value = p;
+}
+
+// ================================================================
+// EDIT PRESETS — categorized prompt library for image editing
+// Each preset is a fully-formed English prompt that the AI handles well.
+// ================================================================
+const EDIT_PRESETS = {
+  // ─── Background ───
+  'bg-white':          { category: 'bg', icon: '⬜', en: 'Pure white', ko: '흰 배경',
+    prompt: 'Replace the background with a clean pure white seamless studio backdrop. Keep the subject and garment exactly as is.' },
+  'bg-studio-gray':    { category: 'bg', icon: '◽', en: 'Studio gray', ko: '스튜디오 그레이',
+    prompt: 'Replace the background with a soft neutral gray studio backdrop with subtle gradient. Keep the subject and garment exactly as is.' },
+  'bg-paris':          { category: 'bg', icon: '🇫🇷', en: 'Paris street', ko: '파리 거리',
+    prompt: 'Place the subject on a charming Paris cobblestone street, Le Marais district, golden hour lighting, Haussmann architecture. Keep the garment, pose, and face identical.' },
+  'bg-malibu':         { category: 'bg', icon: '🌊', en: 'Malibu cliffs', ko: '말리부 절벽',
+    prompt: 'Place the subject on Malibu Point Dume cliffs at sunset with Pacific Ocean horizon. Keep the garment, pose, and face identical.' },
+  'bg-soho':           { category: 'bg', icon: '🗽', en: 'NYC SoHo', ko: '뉴욕 소호',
+    prompt: 'Place the subject on a SoHo NYC street with cast-iron architecture and red brick. Shot on Leica M6, Portra 400 film. Keep the garment, pose, and face identical.' },
+  'bg-cleaner':        { category: 'bg', icon: '🧹', en: 'Cleaner / simpler', ko: '배경 단순화',
+    prompt: 'Simplify the background — remove distracting elements, keep only minimal context. Preserve the subject and garment exactly.' },
+
+  // ─── Lighting ───
+  'lt-brighter':       { category: 'lt', icon: '☀️', en: 'Brighter & natural', ko: '밝고 자연스럽게',
+    prompt: 'Increase brightness and use soft natural daylight. No harsh shadows. Keep the garment colors accurate.' },
+  'lt-golden-hour':    { category: 'lt', icon: '🌇', en: 'Golden hour', ko: '골든아워',
+    prompt: 'Apply warm golden hour lighting with soft directional sun and long shadows. Cinematic warmth. Keep garment details intact.' },
+  'lt-soft-shadow':    { category: 'lt', icon: '🌑', en: 'Add soft shadows', ko: '부드러운 그림자',
+    prompt: 'Add subtle soft directional shadows to give the subject more depth and dimension.' },
+  'lt-studio-flash':   { category: 'lt', icon: '⚡', en: 'Studio flash', ko: '스튜디오 플래시',
+    prompt: 'Apply crisp studio flash lighting with even illumination. Editorial commercial look. Sharp detail.' },
+  'lt-dramatic':       { category: 'lt', icon: '🎭', en: 'Dramatic / moody', ko: '드라마틱',
+    prompt: 'Apply dramatic moody lighting with strong contrast and chiaroscuro. Editorial fashion film look.' },
+
+  // ─── Color & Style ───
+  'co-vibrant':        { category: 'co', icon: '🌈', en: 'More vibrant', ko: '채도 ↑',
+    prompt: 'Boost color saturation and vibrancy while keeping skin tones natural. Make the garment colors pop.' },
+  'co-muted':          { category: 'co', icon: '🪶', en: 'Muted / matte', ko: '뮤트 톤',
+    prompt: 'Reduce saturation slightly and apply a muted matte film tone. Editorial magazine look.' },
+  'co-film-grain':     { category: 'co', icon: '🎞', en: 'Film grain', ko: '필름 그레인',
+    prompt: 'Add subtle 35mm film grain and analog texture. Slight color shift toward warm. Portra 400 character.' },
+  'co-bw':             { category: 'co', icon: '⚫', en: 'Black & white', ko: '흑백',
+    prompt: 'Convert to high-contrast black and white. Tri-X 400 film aesthetic with rich blacks.' },
+  'co-pastel':         { category: 'co', icon: '🌷', en: 'Pastel dreamy', ko: '파스텔 드리미',
+    prompt: 'Apply soft pastel color grading with a dreamy haze. Pinterest aesthetic.' },
+
+  // ─── Fix / Retouch ───
+  'fx-skin':           { category: 'fx', icon: '✨', en: 'Natural skin retouch', ko: '피부 자연스럽게',
+    prompt: 'Subtly retouch the skin to look smooth and natural while keeping pores and texture. Do not over-smooth.' },
+  'fx-wrinkles':       { category: 'fx', icon: '🧺', en: 'Smooth garment', ko: '주름 펴기',
+    prompt: 'Smooth out wrinkles and creases on the garment so it looks freshly steamed. Keep fabric texture.' },
+  'fx-sharper':        { category: 'fx', icon: '🔍', en: 'Sharper details', ko: '디테일 ↑',
+    prompt: 'Increase fine detail and sharpness throughout, especially in fabric texture and stitching.' },
+  'fx-zoom-in':        { category: 'fx', icon: '🔎', en: 'Tighter framing', ko: '타이트한 구도',
+    prompt: 'Re-frame to a tighter portrait composition focusing on the upper body and garment. Maintain subject identity exactly.' },
+  'fx-full-body':      { category: 'fx', icon: '👤', en: 'Full body shot', ko: '전신 샷',
+    prompt: 'Re-frame to a full body shot showing the entire garment from head to toe. Maintain subject identity exactly.' },
+
+  // ─── AI Crop (uses AI to recompose, vs Manual Crop which is instant pixel cut) ───
+  'crop-1-1-ai':       { category: 'crop', icon: '⬛', en: 'Recompose 1:1 (AI)', ko: '1:1 재구성 (AI)',
+    prompt: 'Recompose the image as a 1:1 square crop optimized for Instagram. Center the subject and garment. Maintain identity and detail exactly.' },
+  'crop-4-5-ai':       { category: 'crop', icon: '📱', en: 'Recompose 4:5 (AI)', ko: '4:5 재구성 (AI)',
+    prompt: 'Recompose the image as a 4:5 portrait crop optimized for Instagram feed. Maintain identity and detail exactly.' },
+  'crop-9-16-ai':      { category: 'crop', icon: '📲', en: 'Recompose 9:16 (AI)', ko: '9:16 재구성 (AI)',
+    prompt: 'Recompose the image as a 9:16 vertical crop for Reels/Stories. Maintain identity and detail exactly.' },
+};
+
+const EDIT_PRESET_CATEGORIES = [
+  { key: 'bg',   en: 'Background', ko: '배경',   icon: '🏞' },
+  { key: 'lt',   en: 'Lighting',   ko: '조명',   icon: '💡' },
+  { key: 'co',   en: 'Color',      ko: '컬러',   icon: '🎨' },
+  { key: 'fx',   en: 'Fix',        ko: '보정',   icon: '🔧' },
+  { key: 'crop', en: 'Recompose',  ko: '재구성', icon: '✂️' },
+];
+
+let activeEditPresetCategory = 'bg';
+
+function renderEditPresetTabs() {
+  const container = document.getElementById('editPresetTabs');
+  if (!container) return;
+  container.innerHTML = EDIT_PRESET_CATEGORIES.map(c => {
+    const label = currentLang === 'ko' ? c.ko : c.en;
+    return `<button type="button" class="edit-preset-tab${c.key === activeEditPresetCategory ? ' active' : ''}" data-cat="${c.key}">
+      ${c.icon} ${label}
+    </button>`;
+  }).join('');
+}
+
+function renderEditPresetGrid() {
+  const container = document.getElementById('editPresetGrid');
+  if (!container) return;
+  const entries = Object.entries(EDIT_PRESETS).filter(([_, p]) => p.category === activeEditPresetCategory);
+  container.innerHTML = entries.map(([key, p]) => {
+    const label = currentLang === 'ko' ? p.ko : p.en;
+    return `<div class="edit-preset-card" data-preset="${key}" title="${escapeHtml(p.prompt)}">
+      <span class="epc-icon">${p.icon}</span>${escapeHtml(label)}
+    </div>`;
+  }).join('');
+}
+
+// Wire up edit-preset tab + card clicks (use document-level event handler)
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.edit-preset-tab');
+  if (tab) {
+    activeEditPresetCategory = tab.dataset.cat;
+    renderEditPresetTabs();
+    renderEditPresetGrid();
+    return;
+  }
+  const card = e.target.closest('.edit-preset-card');
+  if (card) {
+    const preset = EDIT_PRESETS[card.dataset.preset];
+    if (preset) {
+      document.getElementById('editPrompt').value = preset.prompt;
+      toast((currentLang==='ko'?'프롬프트 적용됨: ':'Prompt applied: ') + (currentLang==='ko' ? preset.ko : preset.en), 'success');
+    }
+    return;
+  }
+  // Manual crop ratio chip
+  const cropChip = e.target.closest('.manual-crop-chip');
+  if (cropChip) {
+    const ratio = cropChip.dataset.cropRatio;
+    startManualCrop(ratio);
+    document.querySelectorAll('.manual-crop-chip').forEach(c => c.classList.remove('active'));
+    cropChip.classList.add('active');
+  }
+});
+
+function initEditPresets() {
+  if (!document.getElementById('editPresetTabs')) return;
+  renderEditPresetTabs();
+  renderEditPresetGrid();
+}
+initEditPresets();
+
+// ================================================================
+// CLAUDE-POWERED EDIT PROMPT REFINE
+// ================================================================
+async function refineEditPrompt() {
+  const el = document.getElementById('editPrompt');
+  const current = el.value.trim();
+  if (!current) {
+    toast(currentLang==='ko' ? '먼저 짧게라도 수정 내용을 입력하세요' : 'Type a brief instruction first', 'error');
+    return;
+  }
+  const originalDisabled = el.disabled;
+  el.disabled = true;
+  el.style.opacity = '0.6';
+  try {
+    if (window.MODLAI_USE_MOCK) {
+      // Mock — just append example detail
+      el.value = current + ' (with cinematic editorial framing, soft directional light, magazine-quality finish)';
+    } else {
+      const res = await MODLai.refinePrompt(current, {
+        feedbackContext: 'This is an IMAGE EDITING instruction (not a generation prompt). Expand it with specific photographic terminology that an image-edit AI handles well: lighting direction, color tone, framing, texture preservation. Keep it under 80 words. Always end with: "Preserve the subject identity, garment details, and overall composition."',
+      });
+      el.value = res.refinedPrompt || current;
+    }
+    toast(currentLang==='ko' ? 'Claude가 프롬프트 개선했어요' : 'Claude refined your prompt', 'success');
+  } catch (err) {
+    console.error('[refine-edit] failed:', err);
+    toast((currentLang==='ko'?'개선 실패: ':'Refine failed: ') + err.message, 'error');
+  } finally {
+    el.disabled = originalDisabled;
+    el.style.opacity = '';
+  }
+}
+
+// ================================================================
+// DRAG-AND-DROP IMAGE INTO EDIT CANVAS
+// ================================================================
+function handleEditDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const wrap = document.getElementById('editCanvasWrap');
+  if (wrap && !wrap.classList.contains('dragover')) {
+    wrap.classList.add('dragover');
+    wrap.dataset.dropLabel = currentLang === 'ko' ? '여기에 놓으세요' : 'Drop image here';
+  }
+}
+function handleEditDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  // Only remove if leaving the wrap entirely (not a child element)
+  const wrap = document.getElementById('editCanvasWrap');
+  if (e.target === wrap || !wrap.contains(e.relatedTarget)) {
+    wrap.classList.remove('dragover');
+  }
+}
+function handleEditDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const wrap = document.getElementById('editCanvasWrap');
+  wrap.classList.remove('dragover');
+
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    toast(currentLang==='ko' ? '이미지 파일만 가능해요' : 'Only image files supported', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    state.currentEditImage = { url: ev.target.result, id: 'drop_' + Date.now(), generationId: null };
+    state.editHistory = [];
+    renderEditCanvas();
+    toast(currentLang==='ko' ? '이미지 업로드됨' : 'Image uploaded', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ================================================================
+// MANUAL CROP — pixel-perfect, instant, no AI
+// ================================================================
+const cropState = {
+  active: false,
+  ratio: null,         // 'free', '1:1', '4:5', '9:16', '16:9', '3:4'
+  rect: null,          // { x, y, w, h } — in displayed pixel coords
+  imgEl: null,         // <img> reference
+  hostEl: null,        // wrapper for overlay positioning
+  overlayEl: null,
+  draggingMode: null,  // 'move', 'resize-tl', 'resize-tr', 'resize-bl', 'resize-br', 'create'
+  dragStart: null,
+};
+
+function parseRatio(r) {
+  if (r === 'free' || !r) return null;
+  const [a, b] = r.split(':').map(Number);
+  return a / b;
+}
+
+function startManualCrop(ratio) {
+  if (!state.currentEditImage) {
+    toast(currentLang==='ko' ? '먼저 편집할 이미지를 선택하세요' : 'Select an image first', 'error');
+    document.querySelectorAll('.manual-crop-chip').forEach(c => c.classList.remove('active'));
+    return;
+  }
+  cropState.active = true;
+  cropState.ratio = ratio;
+  setupCropOverlay();
+  document.getElementById('manualCropActions').style.display = 'flex';
+}
+
+function setupCropOverlay() {
+  const wrap = document.getElementById('editCanvasWrap');
+  const img = wrap.querySelector('.edit-canvas');
+  if (!img) return;
+
+  // If image isn't loaded yet, wait
+  if (!img.complete || !img.naturalWidth) {
+    img.addEventListener('load', setupCropOverlay, { once: true });
+    return;
+  }
+
+  // Wrap image in a positioned host if not already
+  let host = img.closest('.crop-canvas-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.className = 'crop-canvas-host';
+    img.parentNode.insertBefore(host, img);
+    host.appendChild(img);
+  }
+  cropState.hostEl = host;
+  cropState.imgEl = img;
+
+  // Initial crop rect — center 60% with the right ratio
+  const rect = img.getBoundingClientRect();
+  const dispW = img.clientWidth;
+  const dispH = img.clientHeight;
+  const ratioVal = parseRatio(cropState.ratio);
+
+  let w, h;
+  if (ratioVal === null) {
+    // Free
+    w = dispW * 0.6; h = dispH * 0.6;
+  } else if (ratioVal >= 1) {
+    // Wider than tall
+    w = dispW * 0.7; h = w / ratioVal;
+    if (h > dispH * 0.9) { h = dispH * 0.9; w = h * ratioVal; }
+  } else {
+    h = dispH * 0.7; w = h * ratioVal;
+    if (w > dispW * 0.9) { w = dispW * 0.9; h = w / ratioVal; }
+  }
+  cropState.rect = {
+    x: (dispW - w) / 2,
+    y: (dispH - h) / 2,
+    w, h,
+  };
+
+  // Build overlay
+  removeCropOverlay(false);
+  const ov = document.createElement('div');
+  ov.className = 'crop-overlay';
+  ov.innerHTML = `
+    <div class="crop-info" id="cropInfo"></div>
+    <div class="crop-overlay-handle tl" data-handle="tl"></div>
+    <div class="crop-overlay-handle tr" data-handle="tr"></div>
+    <div class="crop-overlay-handle bl" data-handle="bl"></div>
+    <div class="crop-overlay-handle br" data-handle="br"></div>
+  `;
+  host.appendChild(ov);
+  cropState.overlayEl = ov;
+  applyCropRectToOverlay();
+
+  // Wire up drag/resize
+  ov.addEventListener('mousedown', onCropMouseDown);
+  ov.addEventListener('touchstart', onCropTouchStart, { passive: false });
+}
+
+function applyCropRectToOverlay() {
+  const ov = cropState.overlayEl;
+  const r = cropState.rect;
+  if (!ov || !r) return;
+  ov.style.left = r.x + 'px';
+  ov.style.top  = r.y + 'px';
+  ov.style.width = r.w + 'px';
+  ov.style.height = r.h + 'px';
+  // Show pixel info (in natural-image coords)
+  const img = cropState.imgEl;
+  const scaleX = img.naturalWidth / img.clientWidth;
+  const scaleY = img.naturalHeight / img.clientHeight;
+  const info = ov.querySelector('#cropInfo');
+  if (info) {
+    info.textContent = `${Math.round(r.w * scaleX)} × ${Math.round(r.h * scaleY)} px`;
+  }
+}
+
+function onCropMouseDown(e) {
+  e.preventDefault();
+  const handle = e.target.closest('.crop-overlay-handle');
+  cropState.draggingMode = handle ? 'resize-' + handle.dataset.handle : 'move';
+  cropState.dragStart = {
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    rect: { ...cropState.rect },
+  };
+  document.addEventListener('mousemove', onCropMouseMove);
+  document.addEventListener('mouseup', onCropMouseUp);
+}
+function onCropTouchStart(e) {
+  if (!e.touches[0]) return;
+  e.preventDefault();
+  const handle = e.target.closest('.crop-overlay-handle');
+  cropState.draggingMode = handle ? 'resize-' + handle.dataset.handle : 'move';
+  cropState.dragStart = {
+    mouseX: e.touches[0].clientX,
+    mouseY: e.touches[0].clientY,
+    rect: { ...cropState.rect },
+  };
+  document.addEventListener('touchmove', onCropTouchMove, { passive: false });
+  document.addEventListener('touchend', onCropMouseUp);
+}
+function onCropMouseMove(e) { applyCropDelta(e.clientX, e.clientY); }
+function onCropTouchMove(e) {
+  if (!e.touches[0]) return;
+  e.preventDefault();
+  applyCropDelta(e.touches[0].clientX, e.touches[0].clientY);
+}
+function applyCropDelta(curX, curY) {
+  if (!cropState.draggingMode || !cropState.dragStart) return;
+  const dx = curX - cropState.dragStart.mouseX;
+  const dy = curY - cropState.dragStart.mouseY;
+  const start = cropState.dragStart.rect;
+  const img = cropState.imgEl;
+  const maxW = img.clientWidth;
+  const maxH = img.clientHeight;
+  const ratioVal = parseRatio(cropState.ratio);
+
+  let r = { ...start };
+
+  if (cropState.draggingMode === 'move') {
+    r.x = Math.max(0, Math.min(maxW - r.w, start.x + dx));
+    r.y = Math.max(0, Math.min(maxH - r.h, start.y + dy));
+  } else {
+    // Resize
+    const m = cropState.draggingMode;
+    if (m === 'resize-br') {
+      r.w = Math.max(20, start.w + dx);
+      r.h = ratioVal ? r.w / ratioVal : Math.max(20, start.h + dy);
+    } else if (m === 'resize-bl') {
+      const newW = Math.max(20, start.w - dx);
+      r.x = start.x + (start.w - newW);
+      r.w = newW;
+      r.h = ratioVal ? r.w / ratioVal : Math.max(20, start.h + dy);
+    } else if (m === 'resize-tr') {
+      r.w = Math.max(20, start.w + dx);
+      const newH = ratioVal ? r.w / ratioVal : Math.max(20, start.h - dy);
+      r.y = start.y + (start.h - newH);
+      r.h = newH;
+    } else if (m === 'resize-tl') {
+      const newW = Math.max(20, start.w - dx);
+      r.x = start.x + (start.w - newW);
+      r.w = newW;
+      const newH = ratioVal ? r.w / ratioVal : Math.max(20, start.h - dy);
+      r.y = start.y + (start.h - newH);
+      r.h = newH;
+    }
+    // Clamp to image bounds
+    if (r.x < 0)            { r.w += r.x; r.x = 0; }
+    if (r.y < 0)            { r.h += r.y; r.y = 0; }
+    if (r.x + r.w > maxW)   { r.w = maxW - r.x; if (ratioVal) r.h = r.w / ratioVal; }
+    if (r.y + r.h > maxH)   { r.h = maxH - r.y; if (ratioVal) r.w = r.h * ratioVal; }
+  }
+  cropState.rect = r;
+  applyCropRectToOverlay();
+}
+function onCropMouseUp() {
+  cropState.draggingMode = null;
+  cropState.dragStart = null;
+  document.removeEventListener('mousemove', onCropMouseMove);
+  document.removeEventListener('mouseup', onCropMouseUp);
+  document.removeEventListener('touchmove', onCropTouchMove);
+  document.removeEventListener('touchend', onCropMouseUp);
+}
+
+function removeCropOverlay(restoreImg = true) {
+  if (cropState.overlayEl && cropState.overlayEl.parentNode) {
+    cropState.overlayEl.parentNode.removeChild(cropState.overlayEl);
+  }
+  cropState.overlayEl = null;
+  // Unwrap image from host
+  if (restoreImg && cropState.hostEl && cropState.imgEl) {
+    cropState.hostEl.parentNode.insertBefore(cropState.imgEl, cropState.hostEl);
+    cropState.hostEl.parentNode.removeChild(cropState.hostEl);
+    cropState.hostEl = null;
+  }
+}
+
+function cancelManualCrop() {
+  cropState.active = false;
+  cropState.ratio = null;
+  cropState.rect = null;
+  removeCropOverlay(true);
+  document.getElementById('manualCropActions').style.display = 'none';
+  document.querySelectorAll('.manual-crop-chip').forEach(c => c.classList.remove('active'));
+}
+
+async function applyManualCrop() {
+  if (!cropState.active || !cropState.rect || !cropState.imgEl) {
+    toast(currentLang==='ko' ? '크롭할 영역이 없어요' : 'No crop region', 'error');
+    return;
+  }
+  const img = cropState.imgEl;
+  const r = cropState.rect;
+  const scaleX = img.naturalWidth / img.clientWidth;
+  const scaleY = img.naturalHeight / img.clientHeight;
+
+  // Source rect in natural-image coords
+  const sx = Math.round(r.x * scaleX);
+  const sy = Math.round(r.y * scaleY);
+  const sw = Math.round(r.w * scaleX);
+  const sh = Math.round(r.h * scaleY);
+
+  // Draw to canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = sw;
+  canvas.height = sh;
+  const ctx = canvas.getContext('2d');
+
+  // For cross-origin images (Supabase URLs), we may need to load via fetch first
+  // because canvas.toDataURL throws on tainted canvas.
+  let drawImg = img;
+  let needsFetch = false;
+  try {
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    canvas.toDataURL('image/png'); // probe
+  } catch (e) {
+    // Tainted — re-fetch via blob URL
+    needsFetch = true;
+  }
+
+  if (needsFetch) {
+    try {
+      const resp = await fetch(state.currentEditImage.url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      drawImg = new Image();
+      drawImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        drawImg.onload = resolve;
+        drawImg.onerror = reject;
+        drawImg.src = blobUrl;
+      });
+      // Recompute since natural sizes should match
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(drawImg, sx, sy, sw, sh, 0, 0, sw, sh);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      toast((currentLang==='ko'?'크롭 실패: ':'Crop failed: ') + err.message, 'error');
+      return;
+    }
+  }
+
+  const dataUrl = canvas.toDataURL('image/png');
+
+  // Update edit image to the cropped data URL — instant, no AI, no credits
+  state.currentEditImage = {
+    url: dataUrl,
+    id: 'crop_' + Date.now(),
+    generationId: null,  // local-only until user does an AI edit on top
+  };
+  state.editHistory.unshift({
+    prompt: `[Manual crop ${cropState.ratio || 'free'}] ${sw}×${sh}`,
+    time: new Date().toLocaleTimeString(currentLang === 'ko' ? 'ko-KR' : 'en-US', {hour:'2-digit', minute:'2-digit'}),
+    imageUrl: dataUrl,
+    generationId: null,
+  });
+
+  cancelManualCrop();
+  renderEditCanvas();
+  toast(currentLang==='ko' ? `크롭 완료 · ${sw}×${sh}px` : `Cropped · ${sw}×${sh}px`, 'success');
 }
 
 async function applyEdit() {
