@@ -288,6 +288,7 @@ export async function requireAdmin(req) {
 // ─────────────────────────────────────────────
 export const MODEL_COSTS = {
   nanobanana: 30,
+  nanobanana2: 40,    // Nano Banana 2 (Gemini 3.1 Flash Image) — premium tier
   openai: 50,
   stability: 20,
 };

@@ -53,7 +53,7 @@ create or replace view public.fashion_models_full as
 select
   m.*,
   (select count(*)::int from public.fashion_model_sheets s
-    where s.model_id = m.id) as sheet_count,
+    where s.fashion_model_id = m.id) as sheet_count,
   (select count(*)::int from public.generations g
     where g.fashion_model_id = m.id) as use_count
 from public.fashion_models m;
