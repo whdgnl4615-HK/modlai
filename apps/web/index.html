@@ -2469,6 +2469,9 @@
 
       <div class="edit-layout">
         <!-- LEFT: Canvas with drag-drop + manual crop overlay -->
+        <!-- The file input lives OUTSIDE the canvas wrap so it survives
+             innerHTML replacement when the canvas re-renders. -->
+        <input type="file" id="editFile" accept="image/*" style="display:none" onchange="loadEditImage(event)" />
         <div class="edit-canvas-wrap" id="editCanvasWrap"
              ondragover="handleEditDragOver(event)"
              ondragleave="handleEditDragLeave(event)"
@@ -2478,7 +2481,6 @@
             <div style="font-family:var(--font-display);font-size:22px;margin-bottom:6px;color:var(--text)" data-i18n="edit_empty_title">편집할 이미지를 선택하세요</div>
             <div data-i18n="edit_empty_desc">History에서 이미지를 열거나, 업로드하거나, 여기에 드래그해보세요.</div>
             <button class="btn btn-primary" style="margin-top:20px" onclick="document.getElementById('editFile').click()"><span data-i18n="btn_upload_image">이미지 업로드</span></button>
-            <input type="file" id="editFile" accept="image/*" style="display:none" onchange="loadEditImage(event)" />
           </div>
         </div>
 
